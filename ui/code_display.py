@@ -8,7 +8,7 @@ and handling student review input.
 import streamlit as st
 import logging
 from typing import List, Dict, Any, Optional, Tuple, Callable
-from utils.code_utils import add_line_numbers,strip_error_annotations
+from utils.code_utils import add_line_numbers
 
 # Configure logging
 logging.basicConfig(
@@ -42,37 +42,19 @@ class CodeDisplayUI:
         
         # Handle different input types to get the display code
         if isinstance(code_snippet, str):
-            # If string is passed directly, remove all error comments/annotations
-            from utils.code_utils import strip_error_annotations
-            display_code = strip_error_annotations(code_snippet)
+            display_code = code_snippet.clean_code
         else:
             # If it's a CodeSnippet object
             if hasattr(code_snippet, 'clean_code') and code_snippet.clean_code:
                 # Use clean version for student view
                 display_code = code_snippet.clean_code
             elif hasattr(code_snippet, 'code') and code_snippet.code:
-                # Only fall back if clean_code is not available, and strip comments
-                from utils.code_utils import strip_error_annotations
-                display_code = strip_error_annotations(code_snippet.code)
+                display_code = code_snippet.code
             else:
                 # Handle the case where code_snippet exists but has no code
                 st.warning("Code snippet exists but contains no code. Please try regenerating the code.")
                 return
         
-        # Clean the display code to remove error annotations
-        lines = display_code.splitlines()
-        cleaned_lines = []
-        for line in lines:
-            # Skip any line with ERROR in comments
-            if "// ERROR" in line or "//ERROR" in line or "// error" in line:
-                continue
-            cleaned_lines.append(line)
-        
-        # Only join the lines if we have any
-        if cleaned_lines:
-            display_code = "\n".join(cleaned_lines)
-        else:
-            display_code = "// No code available after removing error annotations"
         
         # Add line numbers to the code snippet
         numbered_code = self._add_line_numbers(display_code)
@@ -96,8 +78,6 @@ class CodeDisplayUI:
         """Add line numbers to code snippet using shared utility."""
         return add_line_numbers(code)
     
-    # In ui/code_display.py, update the render_review_input method:
-
     def render_review_input(self, student_review: str = "", 
                     on_submit_callback: Callable[[str], None] = None,
                     iteration_count: int = 1,

@@ -9,9 +9,6 @@ __all__ = ['WorkflowState', 'CodeSnippet', 'ReviewAttempt']
 from typing import List, Dict, Any, Optional, TypedDict, Literal
 from pydantic import BaseModel, Field
 
-# Update the CodeSnippet class in state_schema.py
-
-
 
 class CodeSnippet(BaseModel):
     """Schema for code snippet data"""

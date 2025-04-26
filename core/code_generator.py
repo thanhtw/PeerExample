@@ -9,7 +9,7 @@ eliminating the reliance on predefined templates.
 import random
 import logging
 from langchain_core.language_models import BaseLanguageModel
-from utils.code_utils import create_code_generation_prompt, extract_code_from_response
+from utils.code_utils import create_code_generation_prompt
 from utils.llm_logger import LLMInteractionLogger
 
 # Configure logging

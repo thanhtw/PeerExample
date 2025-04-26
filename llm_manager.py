@@ -15,7 +15,6 @@ import subprocess
 from typing import Dict, Any, Optional, List, Union, Tuple
 from dotenv import load_dotenv
 import inspect
-from functools import lru_cache
 
 # Update import to use the newer package
 try:
@@ -73,8 +72,13 @@ class LLMManager:
         
         # Force GPU usage by default if available (Ollama only)
         self.force_gpu = os.getenv("ENABLE_GPU", "true").lower() == "true"
-        self.gpu_layers = int(os.getenv("GPU_LAYERS", "-1"))  # -1 means use all available layers
-        
+        # Get the GPU_LAYERS value
+        gpu_layers_value = os.getenv("GPU_LAYERS", "-1")
+        # Extract just the number part in case there are comments in the env var
+        if gpu_layers_value and "#" in gpu_layers_value:
+            gpu_layers_value = gpu_layers_value.split("#")[0].strip()
+            
+        self.gpu_layers = int(gpu_layers_value)
         # Track initialized models
         self.initialized_models = {}
         

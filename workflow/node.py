@@ -39,8 +39,6 @@ class WorkflowNodes:
         self.error_repository = error_repository
         self.llm_logger = llm_logger
     
-    # Fix for workflow/node.py - generate_code_node method
-# This addresses the error count mismatch issue
 
     def generate_code_node(self, state: WorkflowState) -> WorkflowState:
         """

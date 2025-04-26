@@ -21,7 +21,6 @@ class WorkflowConditions:
     """
     
     @staticmethod
-    @staticmethod
     def should_regenerate_or_review(state: WorkflowState) -> str:
         """
         Determine if we should regenerate code or move to review.

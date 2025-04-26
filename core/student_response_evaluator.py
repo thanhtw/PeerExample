@@ -4,7 +4,7 @@ import json
 from typing import List, Dict, Any
 from langchain_core.language_models import BaseLanguageModel
 
-from utils.code_utils import format_list, create_review_analysis_prompt, create_feedback_prompt, process_llm_response
+from utils.code_utils import create_review_analysis_prompt, create_feedback_prompt, process_llm_response
 from utils.llm_logger import LLMInteractionLogger
 
 # Configure logging

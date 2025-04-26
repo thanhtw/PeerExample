@@ -23,18 +23,6 @@ This module provides streamlined prompts for code generation, evaluation,
 and review analysis to reduce token usage while maintaining quality.
 """
 
-def format_list(items: List[str]) -> str:
-    """
-    Format a list of items as a bullet list.
-    
-    Args:
-        items: List of string items
-        
-    Returns:
-        Formatted bullet list as string
-    """
-    return "\n".join([f"- {item}" for item in items])
-
 def add_line_numbers(code: str) -> str:
     """
     Add line numbers to code snippet.
@@ -552,50 +540,6 @@ def create_summary_prompt(code: str, review_history: list, final_analysis: dict)
     
     return prompt
 
-def extract_code_from_response(response, tag: str = None) -> str:
-    """
-    Extract Java code from LLM response with optional tag filtering.
-    Handles both string responses and AIMessage/ChatMessage objects.
-    
-    Args:
-        response: Text response from LLM or AIMessage/ChatMessage object
-        tag: Optional tag to look for (e.g., "java-annotated", "java-clean")
-        
-    Returns:
-        Extracted Java code
-    """
-    # Check for None or empty response
-    if not response:
-        return ""
-    
-    # Handle AIMessage or similar objects (from LangChain)
-    if hasattr(response, 'content'):
-        # Extract the content from the message object
-        response_text = response.content
-    elif isinstance(response, dict) and 'content' in response:
-        # Handle dictionary-like response
-        response_text = response['content']
-    else:
-        # Assume it's already a string
-        response_text = str(response)
-    
-    # If a specific tag is provided, look for that tag
-    if tag:
-        tag_pattern = f"```{tag}\\s*(.*?)\\s*```"
-        code_blocks = re.findall(tag_pattern, response_text, re.DOTALL)
-        if code_blocks:
-            return code_blocks[0]
-    
-    # Try to extract code from any code blocks
-    code_blocks = re.findall(r'```(?:java)?\s*(.*?)\s*```', response_text, re.DOTALL)
-    
-    if code_blocks:
-        # Return the largest code block
-        return max(code_blocks, key=len)
-    
-    # If no code blocks are found, assume the entire response is code
-    return response_text.strip()
-
 def extract_both_code_versions(response) -> Tuple[str, str]:
     """
     Extract both annotated and clean code versions from LLM response.
@@ -857,135 +801,6 @@ This format helps others quickly understand the location, type, and impact of ea
 """
     
     return report
-
-def strip_error_annotations(code: str) -> str:
-    """
-    Remove error annotation comments from code while preserving string literals.
-    Focused on standardized format: // ERROR: [TYPE] - [NAME] - [Description]
-    but still handles legacy formats for backward compatibility.
-    Preserves comments that start with "// Intentional error:" as these indicate
-    deliberate errors for educational purposes.
-    
-    Args:
-        code: The code with error annotations
-        
-    Returns:
-        Clean code without error annotations (except for "// Intentional error:" comments)
-    """
-    import re
-    
-    # Skip processing if code is empty
-    if not code:
-        return code
-    
-    # Standard format pattern (should match most generated annotations)
-    standard_pattern = r'^\s*//\s*ERROR:\s*\[.*?\].*\n'
-    
-    # Match and remove specific error annotation patterns
-    error_patterns = [
-        # Primary standardized format
-        r'^\s*//\s*ERROR:\s*.*-.*\n',
-        
-        # Legacy formats for backward compatibility
-        r'^\s*//\s*ERROR TYPE:.*\n',
-        r'^\s*//\s*ERROR NAME:.*\n',
-        r'^\s*//\s*TODO: Fix.*\n',
-        r'^\s*//\s*FIXME:.*\n',
-        
-        # Very specific patterns that indicate error annotations
-        r'^\s*//.*BUILD ERROR.*\n',
-        r'^\s*//.*CHECKSTYLE ERROR.*\n',
-        r'^\s*//.*LOGICAL ERROR.*\n',
-        r'^\s*//.*RUNTIME ERROR.*\n',
-        
-        # General case for problem area annotations
-        r'^\s*//\s*Problem area:.*\n',
-    ]
-    
-    # Process the code line by line to preserve "// Intentional error:" comments
-    lines = code.splitlines()
-    result_lines = []
-    
-    for line in lines:
-        # Skip lines that match our error patterns unless they start with "// Intentional error:"
-        if re.match(r'^\s*//\s*Intentional error:', line):
-            # Keep this line - it's an intentional error marker we want to preserve
-            result_lines.append(line)
-            continue
-            
-        # Check if this line matches any of our error annotation patterns
-        is_error_annotation = False
-        
-        # Check against standard pattern
-        if re.match(standard_pattern, line):
-            is_error_annotation = True
-        else:
-            # Check against other patterns
-            for pattern in error_patterns:
-                if re.match(pattern, line):
-                    is_error_annotation = True
-                    break
-        
-        # Keep the line if it's not an error annotation
-        if not is_error_annotation:
-            result_lines.append(line)
-    
-    # Join the lines back together
-    result = '\n'.join(result_lines)
-    
-    # Clean up any empty lines created by removing annotations
-    result = re.sub(r'\n\s*\n\s*\n', '\n\n', result)
-    
-    return result
-
-def strip_error_annotations_with_llm(code: str, llm: BaseLanguageModel = None) -> str:
-    """
-    Use LLM to remove error annotation comments from Java code.
-    
-    Args:
-        code: The Java code with error annotations
-        llm: Language model to use for cleaning
-        
-    Returns:
-        Clean code without error annotations
-    """
-    if not code or not llm:
-        return code
-        
-    prompt = f"""Remove all error annotation comments from this Java code.
-    
-            Keep the actual Java code unchanged, but remove any comments that describe errors.
-            Specifically, remove all lines that:
-            1. Start with // ERROR:
-            2. Start with // TODO: Fix
-            3. Contain phrases like "intentional error" or "error annotation"
-            4. Describe bugs, issues, or errors in comments
-
-            Do NOT change any actual Java code - only remove the comment lines.
-            Return only the cleaned Java code without any explanation.
-
-            Original code:
-            ```java
-            {code}
-            """
-    try:
-        # Use the LLM to clean the code
-        response = llm.invoke(prompt)
-        
-        # Extract the code from the response
-        clean_code = extract_code_from_response(response)
-        
-        # If extraction failed, return the full response (which should be just the code)
-        if not clean_code:
-            # Remove any markdown formatting that might be present
-            clean_code = re.sub(r'```.*\n|```', '', response).strip()
-        
-        return clean_code
-        
-    except Exception as e:
-        logger.error(f"Error using LLM to strip error annotations: {str(e)}")
-        # Fall back to the regex-based method as a backup
-        #return strip_error_annotations(code)
 
 def process_llm_response(response):
     """

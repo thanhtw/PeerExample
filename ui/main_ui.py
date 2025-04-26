@@ -469,36 +469,6 @@ def render_sidebar(llm_manager, workflow):
         # Add separator
         st.markdown("---")
         
-        # Add workflow visualization section
-        st.subheader("Workflow Visualization")
-        if st.button("View Workflow Graph", use_container_width=True):
-            try:
-                # Create a temporary file path
-                import tempfile
-                import os
-                temp_dir = tempfile.gettempdir()
-                graph_file = os.path.join(temp_dir, "java_review_workflow.png")
-                
-                # Export the graph
-                if hasattr(workflow.workflow_manager, 'graph_builder'):
-                    filepath = workflow.workflow_manager.graph_builder.export_graph_visualization(graph_file)
-                else:
-                    # Create a temporary GraphBuilder instance
-                    from workflow.builder import GraphBuilder
-                    graph_builder = GraphBuilder(workflow.workflow_nodes)
-                    filepath = graph_builder.export_graph_visualization(graph_file)
-                
-                if filepath and os.path.exists(filepath):
-                    # Display the image
-                    st.image(filepath, caption="Java Code Review Workflow", use_column_width=True)
-                else:
-                    st.error("Failed to generate workflow visualization.")
-            except Exception as e:
-                st.error(f"Error generating workflow visualization: {str(e)}")
-        
-        # Add separator
-        st.markdown("---")
-        
         # Reset button
         if st.button("Reset Application", use_container_width=True):
             # Reset the session state

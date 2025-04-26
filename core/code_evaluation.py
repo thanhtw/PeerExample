@@ -12,7 +12,6 @@ import json
 from typing import List, Dict, Any, Optional, Tuple
 from langchain_core.language_models import BaseLanguageModel
 
-from utils.error_validation import validate_code_errors
 from utils.llm_logger import LLMInteractionLogger
 from utils.code_utils import create_evaluation_prompt, create_regeneration_prompt, process_llm_response
 
@@ -143,7 +142,7 @@ class CodeEvaluationAgent:
                     found_errors.append(error)
         
         # Use the optimized prompt function
-        from utils.code_utils import create_regeneration_prompt
+
         
         prompt = create_regeneration_prompt(
             code=code,
