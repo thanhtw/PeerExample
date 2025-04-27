@@ -649,11 +649,17 @@ def generate_comparison_report(evaluation_errors: List[str], review_analysis: Di
     missed_problems = review_analysis.get("missed_problems", [])
     false_positives = review_analysis.get("false_positives", [])
     
-    # Use original error count if available
-    original_error_count = review_analysis.get("original_error_count", 0)
-    if original_error_count <= 0:
-        # Fallback if not available
-        original_error_count = len(evaluation_errors)
+    # IMPROVED: Get the total problems count directly from the review analysis
+    # This ensures we're using the same count everywhere
+    total_problems = review_analysis.get("total_problems", 0)
+    
+    # If total_problems is not available, try original_error_count
+    if total_problems <= 0:
+        total_problems = review_analysis.get("original_error_count", 0)
+        
+    # Last resort fallback to evaluation_errors length
+    if total_problems <= 0:
+        total_problems = len(evaluation_errors)
     
     # Ensure all problems are properly converted to strings
     known_problems_str = [str(p) if not isinstance(p, str) else p for p in evaluation_errors]
@@ -718,8 +724,7 @@ def generate_comparison_report(evaluation_errors: List[str], review_analysis: Di
             report += "This wasn't actually an issue in the code. "
             report += "Be careful not to flag correct code as problematic.\n\n"
     
-    # Calculate metrics consistently using original error count
-    total_problems = original_error_count
+    # Calculate metrics consistently using total_problems
     identified_count = len(identified_problems_str)
     missed_count = len(missed_problems_str)
     false_positive_count = len(false_positives_str)

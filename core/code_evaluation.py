@@ -272,7 +272,7 @@ class CodeEvaluationAgent:
         }
     
     def _process_evaluation_result(self, result: Dict[str, Any], 
-                            requested_errors: List[Dict[str, Any]]) -> Dict[str, Any]:
+                        requested_errors: List[Dict[str, Any]]) -> Dict[str, Any]:
         """
         Process and enhance the evaluation result with improved type safety.
         
@@ -391,6 +391,9 @@ class CodeEvaluationAgent:
         
         # Validate the "valid" field based on found vs requested errors
         result["valid"] = len(processed_missing_errors) == 0 and len(processed_found_errors) == len(requested_errors)
+        
+        # Store the original requested error count
+        result["original_error_count"] = len(requested_errors)
         
         # Generate a feedback message
         if result["valid"]:

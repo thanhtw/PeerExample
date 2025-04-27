@@ -401,17 +401,19 @@ class WorkflowNodes:
             
             # IMPORTANT: Update the analysis with the original error count
             # This ensures consistent metrics in the UI
-            if "total_problems" in analysis and original_error_count > 0:
+            if original_error_count > 0:
                 # Store the found problem count and original count
                 found_problems_count = len(known_problems)
                 identified_count = analysis.get("identified_count", 0)
                 
+                # IMPORTANT FIX: Override total_problems to use original_error_count
+                analysis["total_problems"] = original_error_count
+                analysis["original_error_count"] = original_error_count
+                
                 # Recalculate percentages based on original count
-                if original_error_count > 0:
-                    analysis["original_error_count"] = original_error_count
-                    analysis["identified_percentage"] = (identified_count / original_error_count) * 100
-                    analysis["accuracy_percentage"] = (identified_count / original_error_count) * 100
-                    
+                analysis["identified_percentage"] = (identified_count / original_error_count) * 100
+                analysis["accuracy_percentage"] = (identified_count / original_error_count) * 100
+                
                 logger.info(f"Updated review analysis: {identified_count}/{original_error_count} " +
                         f"({analysis['identified_percentage']:.1f}%) [Found problems: {found_problems_count}]")
             
