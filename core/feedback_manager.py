@@ -87,16 +87,17 @@ class FeedbackManager:
         self.code_snippet = ""
         self.known_problems = []
     
-    def start_new_review_session(self, code_snippet: str, known_problems: List[str]):
+    def start_new_review_session(self, code_snippet: str, evaluation_result: Dict[str, Any]):
         """
         Start a new review session.
         
         Args:
             code_snippet: The code snippet to be reviewed
-            known_problems: List of known problems in the code
+            evaluation_result: Evaluation results containing found errors
         """
         self.code_snippet = code_snippet
-        self.known_problems = known_problems
+        # Extract found problems from evaluation result
+        self.known_problems = evaluation_result.get('found_errors', [])
         self.review_history = []
         self.current_iteration = 1
         self.review_sufficient = False

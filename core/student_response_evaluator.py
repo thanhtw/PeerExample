@@ -37,16 +37,15 @@ class StudentResponseEvaluator:
         self.min_identified_percentage = min_identified_percentage
         self.llm_logger = llm_logger or LLMInteractionLogger()
     
-    def evaluate_review(self, code_snippet: str, known_problems: List[str], student_review: str, enhanced_errors: List[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def evaluate_review(self, code_snippet: str, known_problems: List[str], student_review: str) -> Dict[str, Any]:
         """
-        Evaluate a student's review with enhanced error detection and analysis.
+        Evaluate a student's review against known problems.
         Uses the create_review_analysis_prompt function from code_utils.
         
         Args:
             code_snippet: The original code snippet with injected errors
             known_problems: List of known problems in the code
             student_review: The student's review comments
-            enhanced_errors: Optional enhanced error data with location information
             
         Returns:
             Dictionary with detailed analysis results
@@ -65,22 +64,18 @@ class StudentResponseEvaluator:
                 student_review=student_review
             )
             
-            
-            
             try:
                 # Metadata for logging
                 metadata = {
                     "code_length": len(code_snippet.splitlines()),
                     "known_problems_count": len(known_problems),
-                    "student_review_length": len(student_review.splitlines()),
-                    "has_enhanced_errors": enhanced_errors is not None
+                    "student_review_length": len(student_review.splitlines())
                 }
                 # Get the evaluation from the LLM
                 logger.info("Sending student review to LLM for evaluation")
                 response = self.llm.invoke(prompt)
                 processed_response = process_llm_response(response)
 
-                #self.llm_logger.log_student_comment_analysis(prompt, response, metadata)
                 # Log the interaction
                 self.llm_logger.log_review_analysis(prompt, processed_response, metadata)
                 
@@ -113,7 +108,7 @@ class StudentResponseEvaluator:
                 return self._fallback_evaluation(known_problems)
             
         except Exception as e:
-            logger.error(f"Exception in evaluate_review_enhanced: {str(e)}")
+            logger.error(f"Exception in evaluate_review: {str(e)}")
             return self._fallback_evaluation(known_problems)
             
     def _process_enhanced_analysis(self, analysis_data: Dict[str, Any], known_problems: List[str]) -> Dict[str, Any]:
@@ -359,9 +354,9 @@ class StudentResponseEvaluator:
                 "raw_text": text[:500] + ("..." if len(text) > 500 else "")
             }
 
-    def generate_targeted_guidance_enhanced(self, code_snippet: str, known_problems: List[str], student_review: str, review_analysis: Dict[str, Any], iteration_count: int, max_iterations: int, enhanced_errors: List[Dict[str, Any]] = None) -> str:
+    def generate_targeted_guidance(self, code_snippet: str, known_problems: List[str], student_review: str, review_analysis: Dict[str, Any], iteration_count: int, max_iterations: int) -> str:
         """
-        Generate enhanced targeted guidance for the student to improve their review.
+        Generate targeted guidance for the student to improve their review.
         Ensures guidance is concise and focused.
         
         Args:
@@ -371,7 +366,7 @@ class StudentResponseEvaluator:
             review_analysis: Analysis of the student review
             iteration_count: Current iteration number
             max_iterations: Maximum number of iterations
-            enhanced_errors: Optional enhanced error information            
+            
         Returns:
             Targeted guidance text
         """        
@@ -420,7 +415,7 @@ class StudentResponseEvaluator:
             return guidance
             
         except Exception as e:
-            logger.error(f"Error generating enhanced guidance with LLM: {str(e)}")            
+            logger.error(f"Error generating guidance with LLM: {str(e)}")            
             # Log the error
             error_metadata = {**metadata, "error": str(e)}
             self.llm_logger.log_interaction("targeted_guidance", prompt, f"ERROR: {str(e)}", error_metadata)            

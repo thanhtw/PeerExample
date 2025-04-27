@@ -220,11 +220,13 @@ class WorkflowManager:
         latest_review = state.review_history[-1]
         
         # Generate comparison report if not already generated
-        if not state.comparison_report and state.code_snippet and state.code_snippet.known_problems:
+        if not state.comparison_report and state.evaluation_result:
             try:
                 logger.info("Generating comparison report for feedback")
+                # Extract error information from evaluation results
+                found_errors = state.evaluation_result.get('found_errors', [])
                 state.comparison_report = generate_comparison_report(
-                    state.code_snippet.known_problems,
+                    found_errors,
                     latest_review.analysis
                 )
             except Exception as e:
@@ -239,6 +241,24 @@ class WorkflowManager:
         if not state.review_summary and self.summary_model and state.code_snippet:
             try:
                 logger.info("Generating review summary with LLM")
+                # Prepare the feedback manager with the current state
+                self.feedback_manager.code_snippet = state.code_snippet.code
+                if state.evaluation_result:
+                    self.feedback_manager.known_problems = state.evaluation_result.get('found_errors', [])
+                self.feedback_manager.review_history = []
+                
+                # Add review history to feedback manager
+                for review in state.review_history:
+                    self.feedback_manager.review_history.append(
+                        FeedbackManager.ReviewIteration(
+                            iteration_number=review.iteration_number,
+                            student_review=review.student_review,
+                            review_analysis=review.analysis,
+                            targeted_guidance=review.targeted_guidance
+                        )
+                    )
+                
+                # Generate the final feedback
                 state.review_summary = self.feedback_manager.generate_final_feedback(
                     llm=self.summary_model,
                     include_resources=True,

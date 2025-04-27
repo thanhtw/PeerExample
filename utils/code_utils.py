@@ -613,12 +613,12 @@ def get_error_count_for_difficulty(difficulty: str) -> int:
     }
     return difficulty_map.get(str(difficulty).lower(), 4)
 
-def generate_comparison_report(known_problems: List[str], review_analysis: Dict[str, Any]) -> str:
+def generate_comparison_report(evaluation_errors: List[str], review_analysis: Dict[str, Any]) -> str:
     """
-    Generate a comparison report between student review and known problems.
+    Generate a comparison report between student review and evaluated errors.
     
     Args:
-        known_problems: List of known problems in the code
+        evaluation_errors: List of errors found by the evaluation
         review_analysis: Analysis of the student review
         
     Returns:
@@ -650,7 +650,7 @@ def generate_comparison_report(known_problems: List[str], review_analysis: Dict[
     false_positives = review_analysis.get("false_positives", [])
     
     # Ensure all problems are properly converted to strings
-    known_problems_str = [str(p) if not isinstance(p, str) else p for p in known_problems]
+    known_problems_str = [str(p) if not isinstance(p, str) else p for p in evaluation_errors]
     identified_problems_str = [str(p) if not isinstance(p, str) else p for p in identified_problems]
     missed_problems_str = [str(p) if not isinstance(p, str) else p for p in missed_problems]
     false_positives_str = [str(p) if not isinstance(p, str) else p for p in false_positives]

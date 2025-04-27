@@ -11,7 +11,6 @@ from typing import Dict, Any, List, Tuple, Optional
 
 from state_schema import WorkflowState, CodeSnippet
 from utils.code_utils import extract_both_code_versions, get_error_count_for_difficulty
-from utils.error_tracking import enrich_error_information
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -76,8 +75,6 @@ class WorkflowNodes:
                 logger.info(f"Using specific errors mode with {len(selected_specific_errors)} errors")
                 # CRITICAL FIX: Pass the selected errors directly without applying count filtering
                 selected_errors = selected_specific_errors
-                basic_problem_descriptions = [f"{error.get('type', '').upper()} - {error.get('name', '')}: {error.get('description', '')}" 
-                                            for error in selected_errors]
             else:
                 # Using category-based selection mode
                 if not selected_error_categories or (
@@ -91,7 +88,7 @@ class WorkflowNodes:
                 
                 # CRITICAL FIX: Get exact number based on difficulty but ensure this isn't modified later
                 required_error_count = get_error_count_for_difficulty(difficulty_level)
-                selected_errors, basic_problem_descriptions = self.error_repository.get_errors_for_llm(
+                selected_errors, _ = self.error_repository.get_errors_for_llm(
                     selected_categories=selected_error_categories,
                     count=required_error_count,
                     difficulty=difficulty_level
@@ -105,7 +102,6 @@ class WorkflowNodes:
                     logger.warning(f"Got more errors ({len(selected_errors)}) than requested ({required_error_count})")
                     # Trim to exactly the required count
                     selected_errors = selected_errors[:required_error_count]
-                    basic_problem_descriptions = basic_problem_descriptions[:required_error_count]
             
             # Log detailed information about selected errors for debugging
             self._log_selected_errors(selected_errors)
@@ -121,22 +117,15 @@ class WorkflowNodes:
 
             # Extract both annotated and clean versions
             annotated_code, clean_code = extract_both_code_versions(response)
-            
-            # Enrich the error information with locations - using the EXACT same selected errors
-            enhanced_errors, detailed_problems = enrich_error_information(
-                    annotated_code, selected_errors
-            )
 
-            # Create code snippet object with enhanced information
+            # Create code snippet object
             code_snippet = CodeSnippet(
                 code=annotated_code,  # Store annotated version with error comments
                 clean_code=clean_code,  # Store clean version without error comments
-                known_problems=detailed_problems,  # Use the detailed problems
                 raw_errors={
                     "build": [e for e in selected_errors if e["type"].lower() == "build"],
                     "checkstyle": [e for e in selected_errors if e["type"].lower() == "checkstyle"]
-                },
-                enhanced_errors=enhanced_errors
+                }
             )
                                     
             # Update state
@@ -181,21 +170,14 @@ class WorkflowNodes:
                 # Get requested errors from state
                 requested_errors = self._extract_requested_errors(state)
                 
-                # Enrich the error information 
-                enhanced_errors, detailed_problems = enrich_error_information(
-                    annotated_code, requested_errors
-                )
-                
                 # Create updated code snippet
                 state.code_snippet = CodeSnippet(
                     code=annotated_code,
                     clean_code=clean_code,
-                    known_problems=detailed_problems,
                     raw_errors={
                         "build": [e for e in requested_errors if e.get("type") == "build"],
                         "checkstyle": [e for e in requested_errors if e.get("type") == "checkstyle"]
-                    },
-                    enhanced_errors=enhanced_errors
+                    }
                 )
                 
                 # Move to evaluation step again
@@ -368,8 +350,11 @@ class WorkflowNodes:
                 return state
                     
             code_snippet = state.code_snippet.code
-            known_problems = state.code_snippet.known_problems
-            enhanced_errors = getattr(state.code_snippet, "enhanced_errors", None)
+            
+            # Use evaluation result to extract problem information
+            known_problems = []
+            if state.evaluation_result and 'found_errors' in state.evaluation_result:
+                known_problems = state.evaluation_result.get('found_errors', [])
             
             # Get the student response evaluator from the evaluator attribute
             evaluator = getattr(self, "evaluator", None)
@@ -377,22 +362,12 @@ class WorkflowNodes:
                 state.error = "Student response evaluator not initialized"
                 return state
             
-            # Use the enhanced evaluation method if available
-            if hasattr(evaluator, 'evaluate_review_enhanced'):
-                analysis = evaluator.evaluate_review_enhanced(
-                    code_snippet=code_snippet,
-                    known_problems=known_problems,
-                    student_review=student_review,
-                    enhanced_errors=enhanced_errors
-                )
-            else:
-                # Fall back to standard evaluation
-                analysis = evaluator.evaluate_review(
-                    code_snippet=code_snippet,
-                    known_problems=known_problems,
-                    student_review=student_review,
-                    enhanced_errors=enhanced_errors
-                )
+            # Use the standard evaluation method
+            analysis = evaluator.evaluate_review(
+                code_snippet=code_snippet,
+                known_problems=known_problems,
+                student_review=student_review
+            )
             
             # Update the review with analysis
             latest_review.analysis = analysis
@@ -403,15 +378,13 @@ class WorkflowNodes:
             
             # Generate targeted guidance if needed
             if not review_sufficient and state.current_iteration < state.max_iterations:
-                targeted_guidance = self._generate_guidance(
-                    evaluator=evaluator,
+                targeted_guidance = evaluator.generate_targeted_guidance(
                     code_snippet=code_snippet,
                     known_problems=known_problems,
                     student_review=student_review,
                     review_analysis=analysis,
                     iteration_count=state.current_iteration,
-                    max_iterations=state.max_iterations,
-                    enhanced_errors=enhanced_errors
+                    max_iterations=state.max_iterations
                 )
                 latest_review.targeted_guidance = targeted_guidance
             
@@ -428,45 +401,43 @@ class WorkflowNodes:
             state.error = f"Error analyzing review: {str(e)}"
             return state
     
-    def _generate_guidance(self, evaluator, code_snippet, known_problems, student_review, 
-                         review_analysis, iteration_count, max_iterations, enhanced_errors=None):
+    def _infer_domain_from_code(self, code: str) -> str:
         """
-        Generate targeted guidance for the student using the appropriate method.
+        Infer the domain of the code based on class and variable names.
         
         Args:
-            evaluator: The student response evaluator
-            code_snippet: The code being reviewed
-            known_problems: List of known problems in the code
-            student_review: The student's review text
-            review_analysis: Analysis of the student's review
-            iteration_count: Current iteration number
-            max_iterations: Maximum number of iterations
-            enhanced_errors: Optional enhanced error information
+            code: The Java code
             
         Returns:
-            Targeted guidance text
+            Inferred domain string
         """
-        # Use enhanced guidance if available
-        if hasattr(evaluator, 'generate_targeted_guidance_enhanced'):
-            return evaluator.generate_targeted_guidance_enhanced(
-                code_snippet=code_snippet,
-                known_problems=known_problems,
-                student_review=student_review,
-                review_analysis=review_analysis,
-                iteration_count=iteration_count,
-                max_iterations=max_iterations,
-                enhanced_errors=enhanced_errors
-            )
-        else:
-            # Fall back to standard guidance
-            return evaluator.generate_targeted_guidance(
-                code_snippet=code_snippet,
-                known_problems=known_problems,
-                student_review=student_review,
-                review_analysis=review_analysis,
-                iteration_count=iteration_count,
-                max_iterations=max_iterations
-            )
+        code_lower = code.lower()
+        
+        # Check for common domains
+        domains = {
+            "student_management": ["student", "course", "enroll", "grade", "academic"],
+            "file_processing": ["file", "read", "write", "path", "directory"],
+            "data_validation": ["validate", "input", "check", "valid", "sanitize"],
+            "calculation": ["calculate", "compute", "math", "formula", "result"],
+            "inventory_system": ["inventory", "product", "stock", "item", "quantity"],
+            "notification_service": ["notify", "message", "alert", "notification", "send"],
+            "banking": ["account", "bank", "transaction", "balance", "deposit"],
+            "e-commerce": ["cart", "product", "order", "payment", "customer"]
+        }
+        
+        # Count domain-related terms
+        domain_scores = {}
+        for domain, terms in domains.items():
+            score = sum(code_lower.count(term) for term in terms)
+            domain_scores[domain] = score
+        
+        # Return the highest scoring domain, or a default
+        if domain_scores:
+            max_domain = max(domain_scores.items(), key=lambda x: x[1])
+            if max_domain[1] > 0:
+                return max_domain[0]
+        
+        return "general_application"  # Default domain
             
     def _extract_requested_errors(self, state: WorkflowState) -> List[Dict[str, Any]]:
         """
