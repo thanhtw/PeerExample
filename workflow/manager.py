@@ -223,12 +223,28 @@ class WorkflowManager:
         if not state.comparison_report and state.evaluation_result:
             try:
                 logger.info("Generating comparison report for feedback")
+                
                 # Extract error information from evaluation results
                 found_errors = state.evaluation_result.get('found_errors', [])
+                
+                # Get original error count for consistent metrics
+                original_error_count = state.original_error_count
+                
+                # Update the analysis with the original error count if needed
+                if original_error_count > 0 and "original_error_count" not in latest_review.analysis:
+                    latest_review.analysis["original_error_count"] = original_error_count
+                    
+                    # Recalculate percentages based on original count
+                    identified_count = latest_review.analysis.get("identified_count", 0) 
+                    latest_review.analysis["identified_percentage"] = (identified_count / original_error_count) * 100
+                    latest_review.analysis["accuracy_percentage"] = (identified_count / original_error_count) * 100
+                
+                # Generate the comparison report with the updated analysis
                 state.comparison_report = generate_comparison_report(
                     found_errors,
                     latest_review.analysis
                 )
+                logger.info("Generated comparison report for feedback")
             except Exception as e:
                 logger.error(f"Error generating comparison report: {str(e)}")
                 state.comparison_report = (
@@ -247,8 +263,22 @@ class WorkflowManager:
                     self.feedback_manager.known_problems = state.evaluation_result.get('found_errors', [])
                 self.feedback_manager.review_history = []
                 
+                # Get the original error count
+                original_error_count = state.original_error_count
+                if original_error_count > 0:
+                    self.feedback_manager.original_error_count = original_error_count
+                
                 # Add review history to feedback manager
                 for review in state.review_history:
+                    # Update the analysis with the original error count if needed
+                    if original_error_count > 0 and "original_error_count" not in review.analysis:
+                        review.analysis["original_error_count"] = original_error_count
+                        
+                        # Recalculate percentages based on original count
+                        identified_count = review.analysis.get("identified_count", 0)
+                        review.analysis["identified_percentage"] = (identified_count / original_error_count) * 100
+                        review.analysis["accuracy_percentage"] = (identified_count / original_error_count) * 100
+                    
                     self.feedback_manager.review_history.append(
                         FeedbackManager.ReviewIteration(
                             iteration_number=review.iteration_number,
@@ -270,13 +300,18 @@ class WorkflowManager:
                 # Generate a fallback summary if LLM fails
                 if latest_review and latest_review.analysis:
                     analysis = latest_review.analysis
+                    
+                    # Use the original error count if available
+                    original_error_count = state.original_error_count
+                    if original_error_count <= 0:
+                        original_error_count = analysis.get("total_problems", 0)
+                    
                     identified_count = analysis.get("identified_count", 0)
-                    total_problems = analysis.get("total_problems", 0)
-                    identified_percentage = analysis.get("identified_percentage", 0)
+                    identified_percentage = (identified_count / original_error_count * 100) if original_error_count > 0 else 0
                     
                     state.review_summary = (
                         f"# Review Summary\n\n"
-                        f"You found {identified_count} out of {total_problems} issues "
+                        f"You found {identified_count} out of {original_error_count} issues "
                         f"({identified_percentage:.1f}% accuracy).\n\n"
                         f"Check the detailed analysis in the comparison report for more information."
                     )

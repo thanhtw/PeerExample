@@ -17,8 +17,6 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# In ui/review_tab.py, update the process_student_review function
-
 def process_student_review(workflow, student_review: str):
     """
     Process a student review with progress indicator and improved error handling.

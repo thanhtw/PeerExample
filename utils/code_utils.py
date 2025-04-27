@@ -649,6 +649,12 @@ def generate_comparison_report(evaluation_errors: List[str], review_analysis: Di
     missed_problems = review_analysis.get("missed_problems", [])
     false_positives = review_analysis.get("false_positives", [])
     
+    # Use original error count if available
+    original_error_count = review_analysis.get("original_error_count", 0)
+    if original_error_count <= 0:
+        # Fallback if not available
+        original_error_count = len(evaluation_errors)
+    
     # Ensure all problems are properly converted to strings
     known_problems_str = [str(p) if not isinstance(p, str) else p for p in evaluation_errors]
     identified_problems_str = [str(p) if not isinstance(p, str) else p for p in identified_problems]
@@ -712,8 +718,8 @@ def generate_comparison_report(evaluation_errors: List[str], review_analysis: Di
             report += "This wasn't actually an issue in the code. "
             report += "Be careful not to flag correct code as problematic.\n\n"
     
-    # Calculate some metrics
-    total_problems = len(known_problems_str)
+    # Calculate metrics consistently using original error count
+    total_problems = original_error_count
     identified_count = len(identified_problems_str)
     missed_count = len(missed_problems_str)
     false_positive_count = len(false_positives_str)
@@ -733,7 +739,7 @@ def generate_comparison_report(evaluation_errors: List[str], review_analysis: Di
         report += "**Needs improvement.** You missed most of the issues in the code.\n\n"
     
     report += f"- You identified {identified_count} out of {total_problems} issues ({accuracy:.1f}%)\n"
-    report += f"- You missed {missed_count} issues\n"
+    report += f"- You missed {total_problems - identified_count} issues\n"
     report += f"- You incorrectly identified {false_positive_count} non-issues\n\n"
     
     # Add improvement tips
@@ -772,33 +778,33 @@ def generate_comparison_report(evaluation_errors: List[str], review_analysis: Di
     # Add systematic approach suggestion
     report += """### Systematic Review Approach
 
-For more thorough code reviews, try this systematic approach:
+        For more thorough code reviews, try this systematic approach:
 
-1. **First pass**: Check for syntax errors, compilation issues, and obvious bugs
-2. **Second pass**: Examine naming conventions, code style, and documentation
-3. **Third pass**: Analyze logical flow, edge cases, and potential runtime errors
-4. **Final pass**: Look for performance issues, security concerns, and maintainability problems
+        1. **First pass**: Check for syntax errors, compilation issues, and obvious bugs
+        2. **Second pass**: Examine naming conventions, code style, and documentation
+        3. **Third pass**: Analyze logical flow, edge cases, and potential runtime errors
+        4. **Final pass**: Look for performance issues, security concerns, and maintainability problems
 
-By following a structured approach, you'll catch more issues and provide more comprehensive reviews.
-"""
+        By following a structured approach, you'll catch more issues and provide more comprehensive reviews.
+        """
     
     # Add effective comment format
     report += """
-### Effective Comment Format
+        ### Effective Comment Format
 
-When writing code review comments, use this format for clarity and consistency:
+        When writing code review comments, use this format for clarity and consistency:
 
-```
-Line X: [Error Type] - Description of the issue and why it's problematic
-```
+        ```
+        Line X: [Error Type] - Description of the issue and why it's problematic
+        ```
 
-For example:
-```
-Line 42: [NullPointerException Risk] - The 'user' variable could be null here, add a null check before calling methods
-```
+        For example:
+        ```
+        Line 42: [NullPointerException Risk] - The 'user' variable could be null here, add a null check before calling methods
+        ```
 
-This format helps others quickly understand the location, type, and impact of each issue.
-"""
+        This format helps others quickly understand the location, type, and impact of each issue.
+        """
     
     return report
 

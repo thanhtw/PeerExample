@@ -241,10 +241,18 @@ def render_generate_tab(workflow, error_selector_ui, code_display_ui):
         
         # Then display the generated code
         st.subheader("Generated Java Code:")
+        
+        # Get found errors from the evaluation result
+        known_problems = []
+        if (hasattr(st.session_state.workflow_state, 'evaluation_result') and 
+            st.session_state.workflow_state.evaluation_result and 
+            'found_errors' in st.session_state.workflow_state.evaluation_result):
+            known_problems = st.session_state.workflow_state.evaluation_result.get('found_errors', [])
+        
         code_display_ui.render_code_display(
             st.session_state.workflow_state.code_snippet,
-            # Show known problems only if we need the instructor view
-            known_problems=st.session_state.workflow_state.code_snippet.known_problems
+            # Show known problems from evaluation result instead of code_snippet.known_problems
+            known_problems=known_problems
         )
         
         # Add button to regenerate code

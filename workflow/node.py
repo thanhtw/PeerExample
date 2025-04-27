@@ -73,8 +73,10 @@ class WorkflowNodes:
                     return state
                     
                 logger.info(f"Using specific errors mode with {len(selected_specific_errors)} errors")
-                # CRITICAL FIX: Pass the selected errors directly without applying count filtering
+                # Use the selected errors directly without applying count filtering
                 selected_errors = selected_specific_errors
+                # Store the original requested error count
+                original_error_count = len(selected_errors)
             else:
                 # Using category-based selection mode
                 if not selected_error_categories or (
@@ -86,7 +88,7 @@ class WorkflowNodes:
                             
                 logger.info(f"Using category-based mode with categories: {selected_error_categories}")
                 
-                # CRITICAL FIX: Get exact number based on difficulty but ensure this isn't modified later
+                # Get exact number based on difficulty
                 required_error_count = get_error_count_for_difficulty(difficulty_level)
                 selected_errors, _ = self.error_repository.get_errors_for_llm(
                     selected_categories=selected_error_categories,
@@ -98,10 +100,14 @@ class WorkflowNodes:
                 if len(selected_errors) < required_error_count:
                     logger.warning(f"Got fewer errors ({len(selected_errors)}) than requested ({required_error_count})")
                     # Don't modify the count in this case - use what we have
+                    original_error_count = len(selected_errors)
                 elif len(selected_errors) > required_error_count:
                     logger.warning(f"Got more errors ({len(selected_errors)}) than requested ({required_error_count})")
                     # Trim to exactly the required count
                     selected_errors = selected_errors[:required_error_count]
+                    original_error_count = required_error_count
+                else:
+                    original_error_count = required_error_count
             
             # Log detailed information about selected errors for debugging
             self._log_selected_errors(selected_errors)
@@ -125,9 +131,13 @@ class WorkflowNodes:
                 raw_errors={
                     "build": [e for e in selected_errors if e["type"].lower() == "build"],
                     "checkstyle": [e for e in selected_errors if e["type"].lower() == "checkstyle"]
-                }
+                },
+                expected_error_count=original_error_count  # Store the original error count in the code snippet
             )
                                     
+            # Update state with the original error count for consistency
+            state.original_error_count = original_error_count
+            
             # Update state
             state.code_snippet = code_snippet
             state.current_step = "evaluate"  # Set to evaluate instead of review to ensure proper workflow
@@ -220,12 +230,27 @@ class WorkflowNodes:
             requested_errors = self._extract_requested_errors(state)
             requested_count = len(requested_errors)
             
+            # Ensure we're using the original error count for consistency
+            original_error_count = state.original_error_count
+            if original_error_count == 0 and hasattr(state.code_snippet, 'expected_error_count'):
+                # If not set in state, try to get it from code snippet
+                original_error_count = state.code_snippet.expected_error_count
+                # Update state with this count
+                state.original_error_count = original_error_count
+                
+            # If we still don't have it, use the requested count
+            if original_error_count == 0:
+                original_error_count = requested_count
+                state.original_error_count = original_error_count
+                
+            logger.info(f"Evaluating code for {original_error_count} expected errors")
+            
             # Evaluate the code
             raw_evaluation_result = self.code_evaluation.evaluate_code(
                 code, requested_errors
             )
             
-            # IMPORTANT FIX: Ensure evaluation_result is a dictionary
+            # IMPORTANT: Ensure evaluation_result is a dictionary
             if not isinstance(raw_evaluation_result, dict):
                 logger.error(f"Expected dict for evaluation_result, got {type(raw_evaluation_result)}")
                 # Create a default dictionary with the necessary structure
@@ -234,10 +259,13 @@ class WorkflowNodes:
                     "missing_errors": [f"{error.get('type', '').upper()} - {error.get('name', '')}" 
                                     for error in requested_errors],
                     "valid": False,
-                    "feedback": f"Error in evaluation. Please ensure the code contains all {len(requested_errors)} requested errors."
+                    "feedback": f"Error in evaluation. Please ensure the code contains all {original_error_count} requested errors.",
+                    "original_error_count": original_error_count  # Add original count for consistency
                 }
             else:
                 evaluation_result = raw_evaluation_result
+                # Add the original error count to the evaluation result
+                evaluation_result["original_error_count"] = original_error_count
             
             # Update state with evaluation results
             state.evaluation_result = evaluation_result
@@ -246,8 +274,7 @@ class WorkflowNodes:
             # Log evaluation results
             found_count = len(evaluation_result.get('found_errors', []))
             missing_count = len(evaluation_result.get('missing_errors', []))
-            total_count = len(requested_errors)
-            logger.info(f"Code evaluation complete: {found_count}/{total_count} errors implemented, {missing_count} missing")
+            logger.info(f"Code evaluation complete: {found_count}/{original_error_count} errors implemented, {missing_count} missing")
             
             # Check if there are extra errors beyond what was requested
             extra_errors = evaluation_result.get('extra_errors', [])
@@ -259,7 +286,7 @@ class WorkflowNodes:
             
             # If we have extra errors, use the updated regeneration function that handles extras
             if has_extra_errors:
-                logger.warning(f"Found {found_count} errors but {requested_count} were requested")
+                logger.warning(f"Found {found_count} errors but {original_error_count} were requested")
                 
                 # Use the version of regeneration prompt that handles extra errors
                 if hasattr(self.code_evaluation, 'generate_improved_prompt_with_extras'):
@@ -352,7 +379,10 @@ class WorkflowNodes:
             code_snippet = state.code_snippet.code
             
             # Use evaluation result to extract problem information
+            # But modify to use the original error count for consistent metrics
             known_problems = []
+            original_error_count = state.original_error_count
+            
             if state.evaluation_result and 'found_errors' in state.evaluation_result:
                 known_problems = state.evaluation_result.get('found_errors', [])
             
@@ -368,6 +398,22 @@ class WorkflowNodes:
                 known_problems=known_problems,
                 student_review=student_review
             )
+            
+            # IMPORTANT: Update the analysis with the original error count
+            # This ensures consistent metrics in the UI
+            if "total_problems" in analysis and original_error_count > 0:
+                # Store the found problem count and original count
+                found_problems_count = len(known_problems)
+                identified_count = analysis.get("identified_count", 0)
+                
+                # Recalculate percentages based on original count
+                if original_error_count > 0:
+                    analysis["original_error_count"] = original_error_count
+                    analysis["identified_percentage"] = (identified_count / original_error_count) * 100
+                    analysis["accuracy_percentage"] = (identified_count / original_error_count) * 100
+                    
+                logger.info(f"Updated review analysis: {identified_count}/{original_error_count} " +
+                        f"({analysis['identified_percentage']:.1f}%) [Found problems: {found_problems_count}]")
             
             # Update the review with analysis
             latest_review.analysis = analysis

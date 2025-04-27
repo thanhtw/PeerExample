@@ -1,4 +1,3 @@
-
 """
 Feedback Tab UI module for Java Peer Review Training System.
 
@@ -40,10 +39,13 @@ def render_feedback_tab(workflow, feedback_display_ui):
     # If we have review history but no comparison report, generate one
     if latest_review and latest_review.analysis and not state.comparison_report:
         try:
-            if state.code_snippet and state.code_snippet.known_problems:
+            # Get the known problems from the evaluation result instead of code_snippet.known_problems
+            if state.evaluation_result and 'found_errors' in state.evaluation_result:
+                found_errors = state.evaluation_result.get('found_errors', [])
+                
                 # Generate a comparison report if it doesn't exist
                 state.comparison_report = generate_comparison_report(
-                    state.code_snippet.known_problems,
+                    found_errors,
                     latest_review.analysis
                 )
                 logger.info("Generated comparison report for feedback tab")

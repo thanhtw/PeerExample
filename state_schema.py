@@ -15,6 +15,7 @@ class CodeSnippet(BaseModel):
     code: str = Field(description="The Java code snippet with annotations")
     clean_code: str = Field("", description="The Java code snippet without annotations")
     raw_errors: Dict[str, List[Dict[str, Any]]] = Field(default_factory=dict, description="Raw error data organized by type")
+    expected_error_count: int = Field(0, description="Number of errors originally requested for code generation")
 
 class ReviewAttempt(BaseModel):
     """Schema for a student review attempt"""
@@ -70,3 +71,6 @@ class WorkflowState(BaseModel):
     max_evaluation_attempts: int = Field(3, description="Maximum number of code generation attempts")
 
     code_generation_feedback: Optional[str] = Field(None, description="Feedback for code generation")
+    
+    # Original requested errors count (for consistency throughout the workflow)
+    original_error_count: int = Field(0, description="Original number of errors requested for generation")

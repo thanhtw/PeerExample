@@ -159,14 +159,29 @@ class FeedbackDisplayUI:
                     st.rerun()
     
     def _render_performance_summary(self, review_analysis: Dict[str, Any], review_history: List[Dict[str, Any]]):
-        """Render performance summary metrics and charts"""
+        """Render performance summary metrics and charts using the consistent original error count"""
         st.subheader("Review Performance Summary")
         
-        # Create performance metrics
+        # Create performance metrics using the original error count if available
         col1, col2, col3 = st.columns(3)
         
+        # Get the correct total_problems count from original_error_count if available
+        original_error_count = review_analysis.get("original_error_count", 0)
+        if original_error_count <= 0:
+            # Fallback to total_problems if original_error_count is not available
+            original_error_count = review_analysis.get("total_problems", 0)
+        
+        # If still zero, make a final check with the found and missed counts
+        if original_error_count <= 0:
+            identified_count = review_analysis.get("identified_count", 0)
+            missed_count = len(review_analysis.get("missed_problems", []))
+            original_error_count = identified_count + missed_count
+        
+        # Now calculate the accuracy using the original count for consistency
+        identified_count = review_analysis.get("identified_count", 0)
+        accuracy = (identified_count / original_error_count * 100) if original_error_count > 0 else 0
+        
         with col1:
-            accuracy = review_analysis.get("accuracy_percentage", 0)
             st.metric(
                 "Overall Accuracy", 
                 f"{accuracy:.1f}%",
@@ -174,11 +189,9 @@ class FeedbackDisplayUI:
             )
             
         with col2:
-            found = review_analysis.get("identified_count", 0)
-            total = review_analysis.get("total_problems", 0)
             st.metric(
                 "Issues Identified", 
-                f"{found}/{total}",
+                f"{identified_count}/{original_error_count}",
                 delta=None
             )
             
@@ -200,9 +213,15 @@ class FeedbackDisplayUI:
             for review in review_history:
                 analysis = review.get("review_analysis", {})
                 iterations.append(review.get("iteration_number", 0))
-                identified_counts.append(analysis.get("identified_count", 0))
-                accuracy_percentages.append(analysis.get("accuracy_percentage", 0))
                 
+                # Use consistent error count for all iterations
+                review_identified = analysis.get("identified_count", 0)
+                identified_counts.append(review_identified)
+                
+                # Calculate accuracy consistently
+                review_accuracy = (review_identified / original_error_count * 100) if original_error_count > 0 else 0
+                accuracy_percentages.append(review_accuracy)
+                    
             # Create a DataFrame for the chart
             chart_data = pd.DataFrame({
                 "Iteration": iterations,
