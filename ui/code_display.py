@@ -73,42 +73,12 @@ class CodeDisplayUI:
         numbered_code = self._add_line_numbers(display_code)
         st.code(numbered_code, language="java")
         
-        # Force instructor view if specified or check session state
-        show_instructor_view = instructor_mode or st.session_state.get("instructor_view", False)
-        
-        # -------------------------------------------------------------------------------
-        # Initialize checkbox key tracking in session state if it doesn't exist
-        if "instructor_view_checkbox_keys" not in st.session_state:
-            st.session_state.instructor_view_checkbox_keys = {}
-            
-        # Deterministic base key for this specific code and tab
-        base_key = f"instructor_view_tab{active_tab}_{code_hash}"
-        
-        # Check if we already have a key for this code and tab
-        if base_key in st.session_state.instructor_view_checkbox_keys:
-            # Use the previously assigned unique suffix
-            key_suffix = st.session_state.instructor_view_checkbox_keys[base_key]
-        else:
-            # Create a new unique suffix 
-            # This ensures different instances of this code/tab combination get different keys
-            import random
-            key_suffix = random.randint(1000, 9999)
-            st.session_state.instructor_view_checkbox_keys[base_key] = key_suffix
-        
-        # Final unique key that is deterministic across app reruns
-        checkbox_key = f"{base_key}_{key_suffix}"
-        # -------------------------------------------------------------------------------
-        
-        # INSTRUCTOR VIEW: Always show the checkbox if we have code
-        # The checkbox will reveal additional instructor options when checked
+       
         instructor_view_enabled = st.checkbox(
             "Show Instructor View (known problems and annotations)", 
-            value=show_instructor_view,
-            key=checkbox_key
+            value=True
         )
         
-        # Update session state with checkbox value
-        st.session_state.instructor_view = instructor_view_enabled
         
         # Display instructor view content if checkbox is checked
         if instructor_view_enabled:
