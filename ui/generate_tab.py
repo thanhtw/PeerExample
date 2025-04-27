@@ -242,16 +242,42 @@ def render_generate_tab(workflow, error_selector_ui, code_display_ui):
         # Then display the generated code
         st.subheader("Generated Java Code:")
         
-        # Get found errors from the evaluation result
+        # Get known problems from multiple sources to ensure we have data for instructor view
         known_problems = []
+        
+        # First, try to get problems from evaluation_result['found_errors']
         if (hasattr(st.session_state.workflow_state, 'evaluation_result') and 
             st.session_state.workflow_state.evaluation_result and 
             'found_errors' in st.session_state.workflow_state.evaluation_result):
-            known_problems = st.session_state.workflow_state.evaluation_result.get('found_errors', [])
+            found_errors = st.session_state.workflow_state.evaluation_result.get('found_errors', [])
+            if found_errors:
+                known_problems = found_errors
         
+        # If we couldn't get known problems from evaluation, try to get from selected errors
+        if not known_problems and hasattr(st.session_state.workflow_state, 'selected_specific_errors'):
+            selected_errors = st.session_state.workflow_state.selected_specific_errors
+            if selected_errors:
+                # Format selected errors to match expected format
+                known_problems = [
+                    f"{error.get('type', '').upper()} - {error.get('name', '')}" 
+                    for error in selected_errors
+                ]
+        
+        # As a last resort, try to extract from raw_errors in code_snippet
+        if not known_problems and hasattr(st.session_state.workflow_state.code_snippet, 'raw_errors'):
+            raw_errors = st.session_state.workflow_state.code_snippet.raw_errors
+            if isinstance(raw_errors, dict):
+                for error_type, errors in raw_errors.items():
+                    for error in errors:
+                        if isinstance(error, dict):
+                            error_type_str = error.get('type', error_type).upper()
+                            error_name = error.get('name', error.get('error_name', error.get('check_name', 'Unknown')))
+                            known_problems.append(f"{error_type_str} - {error_name}")
+        
+        # Always pass known_problems, the render_code_display function will handle showing
+        # the instructor view based on session state and checkbox status
         code_display_ui.render_code_display(
             st.session_state.workflow_state.code_snippet,
-            # Show known problems from evaluation result instead of code_snippet.known_problems
             known_problems=known_problems
         )
         

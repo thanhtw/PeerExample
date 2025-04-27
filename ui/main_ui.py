@@ -49,6 +49,10 @@ def init_session_state():
     if 'sidebar_tab' not in st.session_state:
         st.session_state.sidebar_tab = "Status"
         
+    # Initialize instructor view flag if not present
+    if 'instructor_view' not in st.session_state:
+        st.session_state.instructor_view = False
+        
     # Initialize current step if needed - directly in workflow_state
     if hasattr(st.session_state, 'workflow_state') and not hasattr(st.session_state.workflow_state, 'current_step'):
         st.session_state.workflow_state.current_step = "generate"

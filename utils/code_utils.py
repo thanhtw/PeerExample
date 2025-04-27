@@ -49,6 +49,7 @@ def add_line_numbers(code: str) -> str:
 def create_regeneration_prompt(code: str, domain: str, missing_errors: list, found_errors: list, requested_errors: list, extra_errors: list = None) -> str:
     """
     Create a focused prompt for regenerating code with missing errors and removing extra errors.
+    Enhanced to provide clear instructions for exact error requirements.
     
     Args:
         code: The original code to improve
@@ -71,12 +72,26 @@ def create_regeneration_prompt(code: str, domain: str, missing_errors: list, fou
         for error in requested_errors:
             error_type = error.get("type", "").upper()
             name = error.get("name", "")
-            if f"{error_type} - {name}" == error_key:
+            key_match = f"{error_type} - {name}" == error_key
+            
+            # Also check for partial matches if exact match fails
+            if not key_match and error_key:
+                # Try to match on error name alone
+                if name and name.lower() in error_key.lower():
+                    key_match = True
+                # Try to match on error type alone
+                elif error_type and error_type.lower() in error_key.lower():
+                    key_match = True
+            
+            if key_match:
                 guide = error.get("implementation_guide", "")
+                description = error.get("description", "")
                 
                 instruction = f"{error_type} - {name}"
+                if description:
+                    instruction += f": {description}"
                 if guide:
-                    instruction += f": {guide}"
+                    instruction += f"\nImplementation: {guide}"
                 missing_instructions.append(instruction)
                 break
     
@@ -94,15 +109,16 @@ def create_regeneration_prompt(code: str, domain: str, missing_errors: list, fou
         {extra_list}
         """
     
-    # Create improved prompt that prevents LLM from fixing errors
+    # Create improved prompt with clearer instructions and error verification steps
     prompt = f"""You are an educational Java error creator who intentionally introduces specific errors in code for teaching purposes.
 
             TASK:
-            Modify this Java code to have EXACTLY {total_requested} errors, implementing any missing errors and removing any extra errors.
+            Modify this Java code to have EXACTLY {total_requested} errors - no more, no fewer.
+            The code must contain ONLY the specific errors requested below.
 
             ORIGINAL CODE DOMAIN: {domain}
 
-            MISSING ERRORS - INTENTIONALLY add these as errors (do NOT fix or solve them):
+            MISSING ERRORS - INTENTIONALLY add these errors (do NOT fix or solve them):
             {missing_text if missing_text else "No missing errors - all requested errors are already implemented."}
 
             EXISTING ERRORS TO KEEP - Do not modify these errors:
@@ -111,14 +127,20 @@ def create_regeneration_prompt(code: str, domain: str, missing_errors: list, fou
             {extra_text}
 
             VERY IMPORTANT INSTRUCTIONS:
-            1. The final code must contain EXACTLY {total_requested} errors - no more, no less
+            1. The final code MUST contain EXACTLY {total_requested} errors - no more, no less
             2. NEVER add comments like "// added to fix", "// fixed", or "// corrected" - these errors are meant to remain as errors!
-            3. Do not add other errors which are not in the requested list
+            3. Do not add any errors which are not in the requested list
             4. Errors must be actual Java errors, not just comments about errors
             5. Use EXACTLY the same {domain} domain and maintain the original code structure
             6. For each error you add, include a comment in the format: // ERROR: [TYPE] - [NAME] - [Brief explanation]
-            7. Do NOT try to improve or fix the code - it should contain bugs for educational purposes
+            7. Do NOT try to improve or fix the code - it should contain intentional bugs for educational purposes
             8. The whole purpose is to create flawed code that students will learn to identify problems in
+
+            VERIFICATION STEPS (DO THIS BEFORE SUBMITTING):
+            1. Count the total number of errors in your code, confirm it's EXACTLY {total_requested}
+            2. Verify each missing error from the list is now implemented
+            3. Confirm all existing errors that should be kept are still present and unchanged
+            4. Ensure any extra errors have been removed
 
             PROVIDE TWO VERSIONS OF THE CODE:
             1. First, provide the ANNOTATED VERSION with error comments, marked with:

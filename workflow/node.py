@@ -222,7 +222,7 @@ class WorkflowNodes:
             if not state.code_snippet:
                 state.error = "No code snippet available for evaluation"
                 return state
-                
+                    
             # Get the code with annotations
             code = state.code_snippet.code
             
@@ -284,9 +284,12 @@ class WorkflowNodes:
             # This ensures we always have feedback ready if needed
             feedback = None
             
+            # If we have missing errors or extra errors, we need to regenerate the code
+            needs_regeneration = missing_count > 0 or has_extra_errors
+            
             # If we have extra errors, use the updated regeneration function that handles extras
             if has_extra_errors:
-                logger.warning(f"Found {found_count} errors but {original_error_count} were requested")
+                logger.warning(f"Found {len(extra_errors)} extra errors beyond the {original_error_count} requested")
                 
                 # Use the version of regeneration prompt that handles extra errors
                 if hasattr(self.code_evaluation, 'generate_improved_prompt_with_extras'):
@@ -297,7 +300,7 @@ class WorkflowNodes:
                     # Import the updated function if not available as a method
                     from utils.code_utils import create_regeneration_prompt
                     
-                    # Prepare data for regeneration
+                    # Prepare data for regeneration with emphasis on having exactly the right errors
                     feedback = create_regeneration_prompt(
                         code=code,
                         domain=self._infer_domain_from_code(code),
@@ -306,12 +309,43 @@ class WorkflowNodes:
                         requested_errors=requested_errors,
                         extra_errors=extra_errors
                     )
-            else:
-                # Use standard regeneration prompt
-                feedback = self.code_evaluation.generate_improved_prompt(
-                    code, requested_errors, evaluation_result
-                )
+            # Missing errors but no extra errors
+            elif missing_count > 0:
+                logger.warning(f"Missing {missing_count} out of {original_error_count} requested errors")
                 
+                # Use standard regeneration prompt but enhance it for clarity
+                if hasattr(self.code_evaluation, 'generate_improved_prompt'):
+                    feedback = self.code_evaluation.generate_improved_prompt(
+                        code, requested_errors, evaluation_result
+                    )
+                else:
+                    # Import the updated function if not available as a method
+                    from utils.code_utils import create_regeneration_prompt
+                    
+                    # Use the regeneration prompt with emphasis on adding missing errors
+                    feedback = create_regeneration_prompt(
+                        code=code,
+                        domain=self._infer_domain_from_code(code),
+                        missing_errors=evaluation_result.get('missing_errors', []),
+                        found_errors=evaluation_result.get('found_errors', []),
+                        requested_errors=requested_errors,
+                        extra_errors=[]
+                    )
+            else:
+                # No missing or extra errors - we're good!
+                logger.info(f"All {original_error_count} requested errors implemented correctly")
+                
+                # Still create a feedback prompt in case we need it later
+                from utils.code_utils import create_regeneration_prompt
+                feedback = create_regeneration_prompt(
+                    code=code,
+                    domain=self._infer_domain_from_code(code),
+                    missing_errors=[],
+                    found_errors=evaluation_result.get('found_errors', []),
+                    requested_errors=requested_errors,
+                    extra_errors=[]
+                )
+                    
             state.code_generation_feedback = feedback
             
             # IMPROVED DECISION LOGIC: Prioritize fixing missing errors over max attempts
@@ -319,10 +353,13 @@ class WorkflowNodes:
             if evaluation_result.get("valid", False):
                 state.current_step = "review"
                 logger.info("All errors successfully implemented, proceeding to review")
-            elif missing_count > 0 and state.evaluation_attempts < state.max_evaluation_attempts:
-                # If we have missing errors and haven't reached max attempts, regenerate
+            elif needs_regeneration and state.evaluation_attempts < state.max_evaluation_attempts:
+                # If we have missing errors or extra errors and haven't reached max attempts, regenerate
                 state.current_step = "regenerate"
-                logger.info(f"Found {missing_count} missing errors, proceeding to regeneration")
+                if missing_count > 0:
+                    logger.info(f"Found {missing_count} missing errors, proceeding to regeneration")
+                if has_extra_errors:
+                    logger.info(f"Found {len(extra_errors)} extra errors, proceeding to regeneration")
             else:
                 # Otherwise, we've either reached max attempts or have no more missing errors
                 state.current_step = "review"

@@ -197,8 +197,32 @@ def render_review_tab(workflow, code_display_ui):
         st.info("No code has been generated yet. Please go to the 'Generate Problem' tab first.")
         return
     
-    # Display the code using the workflow state's code snippet
-    code_display_ui.render_code_display(st.session_state.workflow_state.code_snippet)
+    # Get known problems for instructor view
+    known_problems = []
+    
+    # Extract known problems from evaluation result
+    if (hasattr(st.session_state.workflow_state, 'evaluation_result') and 
+        st.session_state.workflow_state.evaluation_result and 
+        'found_errors' in st.session_state.workflow_state.evaluation_result):
+        found_errors = st.session_state.workflow_state.evaluation_result.get('found_errors', [])
+        if found_errors:
+            known_problems = found_errors
+    
+    # If we couldn't get known problems from evaluation, try to get from selected errors
+    if not known_problems and hasattr(st.session_state.workflow_state, 'selected_specific_errors'):
+        selected_errors = st.session_state.workflow_state.selected_specific_errors
+        if selected_errors:
+            # Format selected errors to match expected format
+            known_problems = [
+                f"{error.get('type', '').upper()} - {error.get('name', '')}" 
+                for error in selected_errors
+            ]
+    
+    # Display the code using the workflow state's code snippet and known problems
+    code_display_ui.render_code_display(
+        st.session_state.workflow_state.code_snippet, 
+        known_problems=known_problems
+    )
     
     # Get current review state
     current_iteration = getattr(st.session_state.workflow_state, 'current_iteration', 1)
