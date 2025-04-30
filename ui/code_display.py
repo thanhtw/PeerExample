@@ -25,104 +25,24 @@ class CodeDisplayUI:
     line numbers, and optional instructor view.    """
     
     def render_code_display(self, code_snippet, known_problems: List[str] = None, instructor_mode: bool = False) -> None:
-        """
-        Render a code snippet with optional known problems for instructor view.
-        
-        Args:
-            code_snippet: Java code snippet to display (string or CodeSnippet object)
-            known_problems: Optional list of known problems for instructor view
-            instructor_mode: Force instructor mode visibility regardless of session state
-        """
         if not code_snippet:
             st.info("No code generated yet. Use the 'Generate Code Problem' tab to create a Java code snippet.")
             return
-        
+
         st.subheader("Java Code to Review:")
-        
-        # Generate a unique ID based on the code content and the active tab
-        import hashlib
-        code_hash = ""
-        if isinstance(code_snippet, str):
-            code_hash = hashlib.md5(code_snippet.encode()).hexdigest()[:8]
-        elif hasattr(code_snippet, 'code'):
-            code_hash = hashlib.md5(code_snippet.code.encode()).hexdigest()[:8]
-        
-        # Get the active tab - this helps differentiate between different views
-        active_tab = st.session_state.get('active_tab', 0)
-        
-        # Handle different input types to get the display code
         if isinstance(code_snippet, str):
             display_code = code_snippet
-            annotated_code = code_snippet
         else:
-            # If it's a CodeSnippet object
             if hasattr(code_snippet, 'clean_code') and code_snippet.clean_code:
-                # Use clean version for student view
                 display_code = code_snippet.clean_code
-            elif hasattr(code_snippet, 'code') and code_snippet.code:
-                display_code = code_snippet.code
             else:
-                # Handle the case where code_snippet exists but has no code
                 st.warning("Code snippet exists but contains no code. Please try regenerating the code.")
                 return
-            
-            # Store annotated code for instructor view
-            annotated_code = code_snippet.code if hasattr(code_snippet, 'code') else display_code
-        
-        # Add line numbers to the code snippet
         numbered_code = self._add_line_numbers(display_code)
         st.code(numbered_code, language="java")
-        
-       
-        instructor_view_enabled = st.checkbox(
-            "Show Instructor View (known problems and annotations)", 
-            value=True
-        )
-        
-        
-        # Display instructor view content if checkbox is checked
-        if instructor_view_enabled:
-            st.subheader("Known Problems (Instructor View):")
-            
-            # If known_problems is provided, use it directly
-            if known_problems and isinstance(known_problems, list) and len(known_problems) > 0:
-                for i, problem in enumerate(known_problems, 1):
-                    if isinstance(problem, dict):
-                        # Extract problem from dictionary if needed
-                        if "problem" in problem:
-                            problem_text = problem["problem"]
-                        elif "error_name" in problem:
-                            problem_text = f"{problem.get('error_type', 'ERROR')} - {problem['error_name']}"
-                        else:
-                            problem_text = str(problem)
-                        st.markdown(f"{i}. {problem_text}")
-                    else:
-                        # Directly use problem if it's already a string
-                        st.markdown(f"{i}. {problem}")
-            else:
-                # Try to extract known problems from code_snippet if available
-                extracted_problems = []
-                
-                # Try to get problems from raw_errors in code_snippet
-                if hasattr(code_snippet, 'raw_errors') and isinstance(code_snippet.raw_errors, dict):
-                    for error_type, errors in code_snippet.raw_errors.items():
-                        for error in errors:
-                            if isinstance(error, dict):
-                                error_type_str = error.get('type', error_type).upper()
-                                error_name = error.get('name', error.get('error_name', error.get('check_name', 'Unknown')))
-                                extracted_problems.append(f"{error_type_str} - {error_name}")
-                
-                if extracted_problems:
-                    for i, problem in enumerate(extracted_problems, 1):
-                        st.markdown(f"{i}. {problem}")
-                else:
-                    st.warning("No known problems information available. Generate code first or check evaluation results.")
-                    
-            # Show annotated code with error comments
-            st.subheader("Annotated Code (with Error Comments):")
-            annotated_code_with_numbers = self._add_line_numbers(annotated_code)
-            st.code(annotated_code_with_numbers, language="java")
-    
+               
+
+
     def _add_line_numbers(self, code: str) -> str:
         """Add line numbers to code snippet using shared utility."""
         return add_line_numbers(code)

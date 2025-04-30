@@ -373,7 +373,7 @@ def create_review_analysis_prompt(code: str, known_problems: list, student_revie
     
     # Create focused analysis prompt with educational assessment role
     prompt = f"""You are an educational assessment expert analyzing a student's Java code review. 
-                Your task is to compare their review against known issues to evaluate accuracy and completeness.
+                Your task is to compare the student review against known issues to evaluate accuracy and completeness.
 
             CODE:
             ```java
@@ -391,8 +391,8 @@ def create_review_analysis_prompt(code: str, known_problems: list, student_revie
             Your Task:
                 1. First, identify ALL actual issues in the code (not just the ones listed in "Known Issues")
                 2. Determine which issues the student identified correctly
-                3.List issues the student missed
-                4. Evaluate the overall effectiveness of their review
+                3. List issues the student missed (ONLY COMPARE in "Known Issues")
+                4. Evaluate the overall effectiveness of the student review
 
             JSON RESPONSE FORMAT:
             ```json

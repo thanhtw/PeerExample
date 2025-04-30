@@ -118,12 +118,12 @@ class FeedbackDisplayUI:
                 with tabs[1]:  # Missed Issues
                     self._render_missed_issues(review_analysis)
                 
-                with tabs[2]:  # False Positives
-                    self._render_false_positives(review_analysis)
+                # with tabs[2]:  # False Positives
+                #     self._render_false_positives(review_analysis)
                 
-                with tabs[3]:  # Summary
-                    if review_summary:
-                        st.markdown(review_summary)
+                # with tabs[3]:  # Summary
+                #     if review_summary:
+                #         st.markdown(review_summary)
         
         # Download button for feedback report
         #if review_summary:
