@@ -565,7 +565,7 @@ def create_summary_prompt(code: str, review_history: list, final_analysis: dict)
 def extract_both_code_versions(response) -> Tuple[str, str]:
     """
     Extract both annotated and clean code versions from LLM response.
-    Handles both string responses and AIMessage/ChatMessage objects.
+    Enhanced to better handle Groq response format differences.
     
     Args:
         response: Text response from LLM or AIMessage/ChatMessage object
@@ -587,6 +587,16 @@ def extract_both_code_versions(response) -> Tuple[str, str]:
     else:
         # Assume it's already a string
         response_text = str(response)
+    
+    # Handle Groq-specific response format
+    # Groq often wraps content differently, so check for that pattern
+    if "content=" in response_text and not response_text.startswith("```"):
+        # Extract just the content part
+        response_text = response_text.replace("content=", "")
+        # Remove any leading/trailing quotes if present
+        if (response_text.startswith('"') and response_text.endswith('"')) or \
+           (response_text.startswith("'") and response_text.endswith("'")):
+            response_text = response_text[1:-1]
     
     # Extract annotated version with java-annotated tag
     annotated_pattern = r'```java-annotated\s*(.*?)\s*```'
@@ -613,8 +623,20 @@ def extract_both_code_versions(response) -> Tuple[str, str]:
                 # Use the largest code block
                 annotated_code = max(any_matches, key=len)
     
-    # If we have annotated code but no clean code, we'll need to handle that at the calling site
-    # by using strip_error_annotations_with_llm
+    # For Groq responses: If we found annotated but no clean code, create clean code by removing error comments
+    if annotated_code and not clean_code:
+        # Remove lines with error comments
+        clean_lines = []
+        for line in annotated_code.splitlines():
+            if "// ERROR:" not in line:
+                clean_lines.append(line)
+        clean_code = "\n".join(clean_lines)
+    
+    # Log detailed information if extraction failed
+    if not annotated_code:
+        logger.warning(f"Failed to extract annotated code from response text: {response_text[:200]}...")
+    if not clean_code:
+        logger.warning(f"Failed to extract clean code from response text: {response_text[:200]}...")
     
     return annotated_code, clean_code
 

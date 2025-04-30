@@ -71,7 +71,7 @@ class CodeEvaluationAgent:
             # Generate the evaluation using the LLM
             logger.info("Sending code to LLM for evaluation")
             response = self.llm.invoke(prompt)
-            
+            print("================response of code evaluation =======================", response)
             # Process response to ensure it's properly formatted
             processed_response = process_llm_response(response)
             
@@ -205,7 +205,7 @@ class CodeEvaluationAgent:
     
     def _extract_json_from_response(self, response: str) -> Optional[Dict[str, Any]]:
         """
-        Extract JSON data from LLM response with improved regex handling and type safety.
+        Extract JSON data from LLM response with improved handling for Groq responses.
         
         Args:
             response: LLM response text
@@ -225,12 +225,30 @@ class CodeEvaluationAgent:
                 logger.error("Could not convert response to string")
                 return None
         
+        # Log first part of response for debugging
+        logger.debug(f"Extracting JSON from response: {response[:200]}...")
+        
+        # First try direct JSON parsing if the response looks like JSON
+        if response.strip().startswith('{') and response.strip().endswith('}'):
+            try:
+                # Clean the response to fix common JSON issues
+                json_str = response.strip()
+                # Fix trailing commas which are invalid in JSON
+                json_str = re.sub(r',\s*}', '}', json_str)
+                json_str = re.sub(r',\s*]', ']', json_str)
+                # Try to parse as JSON directly
+                return json.loads(json_str)
+            except json.JSONDecodeError:
+                # If direct parsing fails, continue with regex extraction
+                pass
+        
         # Try to find JSON block with various patterns
         patterns = [
             r'```json\s*([\s\S]*?)```',  # JSON in code block
             r'```\s*({[\s\S]*?})\s*```',  # Any JSON in code block
             r'({[\s\S]*?"found_errors"[\s\S]*?})',  # JSON with found_errors field
             r'({[\s\S]*?"valid"[\s\S]*?})',  # JSON with valid field
+            r'({[\s\S]*?"missing_errors"[\s\S]*?})',  # JSON with missing_errors field
         ]
         
         for pattern in patterns:
@@ -262,11 +280,45 @@ class CodeEvaluationAgent:
         except:
             pass
         
+        # For Groq responses, if all extraction methods fail, try a more aggressive approach
+        # to build a structured result manually
+        missing_errors = []
+        found_errors = []
+        
+        # Try to extract found_errors section
+        found_match = re.search(r'found_errors:?\s*\n(.*?)(?:missing_errors|\n\n)', response, re.DOTALL)
+        if found_match:
+            found_section = found_match.group(1)
+            # Extract individual errors
+            for line in found_section.splitlines():
+                if line.strip() and ":" in line:
+                    found_errors.append(line.strip())
+        
+        # Try to extract missing_errors section
+        missing_match = re.search(r'missing_errors:?\s*\n(.*?)(?:\n\n|$)', response, re.DOTALL)
+        if missing_match:
+            missing_section = missing_match.group(1)
+            # Extract individual errors
+            for line in missing_section.splitlines():
+                if line.strip() and ":" in line:
+                    missing_errors.append(line.strip())
+        
+        # If we extracted at least some structured data, return a constructed result
+        if found_errors or missing_errors:
+            logger.info(f"Using manually extracted errors: {len(found_errors)} found, {len(missing_errors)} missing")
+            return {
+                "found_errors": found_errors,
+                "missing_errors": missing_errors,
+                "valid": len(missing_errors) == 0,
+                "feedback": f"Found {len(found_errors)} errors, {len(missing_errors)} missing."
+            }
+        
         # If all extraction methods fail, return a default result structure
         logger.warning("Could not extract JSON from response, returning default structure")
+        # Include all requested errors as missing to force regeneration
         return {
             "found_errors": [],
-            "missing_errors": [],
+            "missing_errors": ["EXTRACTION_FAILED"],  # This will force regeneration
             "valid": False,
             "feedback": "Could not extract proper analysis from model response."
         }

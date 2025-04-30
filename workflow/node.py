@@ -346,7 +346,7 @@ class WorkflowNodes:
                 )
                     
             state.code_generation_feedback = feedback
-            print("===================needs_regeneration==============", needs_regeneration)
+          
             # IMPROVED DECISION LOGIC: Prioritize fixing missing errors over max attempts
             # If evaluation passed (all errors implemented with exact count)
             if evaluation_result.get("valid", False):
