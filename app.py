@@ -52,7 +52,7 @@ from ui.review_tab import render_review_tab
 from ui.feedback_tab import render_feedback_tab
 
 # Load environment variables
-load_dotenv()
+load_dotenv(override=True)
 
 # Set page config
 st.set_page_config(

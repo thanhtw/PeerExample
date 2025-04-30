@@ -165,15 +165,26 @@ class WorkflowNodes:
             
             # Generate code with feedback prompt
             if hasattr(self.code_generator, 'llm') and self.code_generator.llm:
-                response = self.code_generator.llm.invoke(feedback_prompt)
+                # Log the regeneration prompt before sending to LLM
                 metadata = {
                     "code_length": state.code_length,
                     "difficulty_level": state.difficulty_level,
                     "domain": "general",
-                    "selected_errors": state.selected_error_categories
+                    "selected_errors": state.selected_error_categories,
+                    "attempt": state.evaluation_attempts,
+                    "max_attempts": state.max_evaluation_attempts
                 }
-
+                
+                # Log the prompt before it's sent to the LLM
+                self.llm_logger.log_regeneration_prompt(feedback_prompt, metadata)
+                
+                # Generate the code
+                response = self.code_generator.llm.invoke(feedback_prompt)
+                
+                # Log the full regeneration with response
                 self.llm_logger.log_code_regeneration(feedback_prompt, response, metadata)
+                
+                # Process the response
                 annotated_code, clean_code = extract_both_code_versions(response)                
                 
                 # Get requested errors from state

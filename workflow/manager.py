@@ -30,11 +30,9 @@ logger = logging.getLogger(__name__)
 class WorkflowManager:
     """
     Manager class for the Java Code Review workflow system.
-    
     This class integrates all components of the workflow system and provides
     a high-level API for interacting with the workflow.
     """
-    
     def __init__(self, llm_manager):
         """
         Initialize the workflow manager with the LLM manager.
@@ -118,7 +116,6 @@ class WorkflowManager:
                 # Force GPU usage
                 os.environ["ENABLE_GPU"] = "true"
                 self.llm_manager.force_gpu = True
-                
                 # Refresh GPU info
                 self.llm_manager.refresh_gpu_info()
             

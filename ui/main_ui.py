@@ -381,8 +381,7 @@ def show_workflow_progress():
     # Create a progress bar based on the current step
     st.markdown("### Workflow Progress")
     
-    steps = ["generate", "evaluate", "regenerate", "review", "analyze", "summarize"]
-    step_labels = ["Generate", "Evaluate", "Regenerate", "Review", "Analyze", "Summarize"]
+    steps = ["generate", "evaluate", "regenerate", "review", "analyze", "summarize"]    
     
     try:
         # Find the index of the current step

@@ -71,7 +71,6 @@ class CodeEvaluationAgent:
             # Generate the evaluation using the LLM
             logger.info("Sending code to LLM for evaluation")
             response = self.llm.invoke(prompt)
-            print("================response of code evaluation =======================", response)
             # Process response to ensure it's properly formatted
             processed_response = process_llm_response(response)
             

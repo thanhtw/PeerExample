@@ -44,13 +44,6 @@ def load_css(css_file=None, css_directory=None):
                     css_content += f.read()
                     loaded_files.append("components.css")
             
-            # Then load model_manager.css
-            model_manager_css_path = os.path.join(css_directory, "model_manager.css")
-            if os.path.exists(model_manager_css_path):
-                with open(model_manager_css_path, 'r') as f:
-                    css_content += f.read()
-                    loaded_files.append("model_manager.css")
-            
             # Finally load tabs.css
             tabs_css_path = os.path.join(css_directory, "tabs.css")
             if os.path.exists(tabs_css_path):
@@ -61,7 +54,7 @@ def load_css(css_file=None, css_directory=None):
             # Load any remaining CSS files (except main.css which is now obsolete)
             for filename in sorted(os.listdir(css_directory)):
                 if (filename.endswith('.css') and 
-                    filename not in ["base.css", "components.css", "model_manager.css", "tabs.css", "main.css"]):
+                    filename not in ["base.css", "components.css", "tabs.css", "main.css"]):
                     file_path = os.path.join(css_directory, filename)
                     with open(file_path, 'r') as f:
                         css_content += f.read()

@@ -210,6 +210,16 @@ class LLMInteractionLogger:
         """
         self.log_interaction("code_regeneration", prompt, response, metadata)
     
+    def log_regeneration_prompt(self, prompt: str, metadata: Optional[Dict[str, Any]] = None) -> None:
+        """
+        Log a regeneration prompt (before it's sent to the LLM).
+        
+        Args:
+            prompt: The regeneration prompt that will be sent to the LLM
+            metadata: Optional metadata about the prompt creation
+        """
+        self.log_interaction("regeneration_prompt", prompt, "N/A - Prompt Only", metadata)
+
     def log_code_evaluation(self, prompt: str, response: Any, metadata: Optional[Dict[str, Any]] = None) -> None:
         """
         Log a code evaluation interaction with enhanced response processing.
