@@ -41,8 +41,6 @@ class CodeDisplayUI:
         numbered_code = self._add_line_numbers(display_code)
         st.code(numbered_code, language="java")
                
-
-
     def _add_line_numbers(self, code: str) -> str:
         """Add line numbers to code snippet using shared utility."""
         return add_line_numbers(code)

@@ -9,6 +9,7 @@ import streamlit as st
 import logging
 import random
 from typing import List, Dict, Any, Optional, Tuple, Callable
+from utils.domain_utils import DOMAIN_LIST
 
 # Configure logging
 logging.basicConfig(
@@ -89,7 +90,7 @@ class ErrorSelectorUI:
             st.session_state.selected_error_categories["checkstyle"] = []
         
         # Build errors section
-        st.markdown("<div class='section-card'>BUILD ISSUEs</div>", unsafe_allow_html=True)
+        st.markdown("<div class='section-card'>BUILD ISSUES</div>", unsafe_allow_html=True)
         
         # Create a multi-column layout for build errors
         build_cols = st.columns(2)
@@ -403,10 +404,6 @@ class ErrorSelectorUI:
         )
         st.markdown('</div>', unsafe_allow_html=True)
         
-        # Print previous and new selection for debugging
-        print(f"\n========== MODE SELECTION CHANGE ==========")
-        print(f"Previous mode: {st.session_state.error_selection_mode}")
-        
         # Update error selection mode based on selection
         new_mode = st.session_state.error_selection_mode
         if "Advanced" in selected_option and st.session_state.error_selection_mode != "advanced":
@@ -416,11 +413,6 @@ class ErrorSelectorUI:
         
         # Only update if the mode has changed
         if new_mode != st.session_state.error_selection_mode:
-            print(f"Mode changing from {st.session_state.error_selection_mode} to {new_mode}")
-            
-            # Store previous mode for reference
-            previous_mode = st.session_state.error_selection_mode
-            
             # Update the mode
             st.session_state.error_selection_mode = new_mode
                 
@@ -429,10 +421,6 @@ class ErrorSelectorUI:
                 # Make sure selected_specific_errors exists
                 if "selected_specific_errors" not in st.session_state:
                     st.session_state.selected_specific_errors = []
-        
-        print(f"Current mode: {st.session_state.error_selection_mode}")
-        print(f"Selected categories: {st.session_state.selected_error_categories}")
-        print("=============================================")
         
         # Show help text for the selected mode
         if st.session_state.error_selection_mode == "advanced":
@@ -454,6 +442,8 @@ class ErrorSelectorUI:
             st.session_state.difficulty_level = "Medium"
         if "code_length" not in st.session_state:
             st.session_state.code_length = "Medium"
+        if "domain" not in st.session_state:
+            st.session_state.domain = "general_application"
         
         st.markdown('<div class="param-container">', unsafe_allow_html=True)
         
@@ -482,32 +472,28 @@ class ErrorSelectorUI:
                 label_visibility="collapsed"
             )
         
+        # Add domain selection
+        st.markdown('<div class="param-title">Code Domain</div>', unsafe_allow_html=True)
+        st.markdown('<div class="param-description">The application domain context for the code</div>', unsafe_allow_html=True)
+        
+        # Format domain options to be more readable
+        domain_options = [domain.replace("_", " ").title() for domain in DOMAIN_LIST]
+        domain_map = {domain_options[i]: DOMAIN_LIST[i] for i in range(len(DOMAIN_LIST))}
+        
+        # Find the current domain in formatted options
+        current_domain_fmt = next((k for k, v in domain_map.items() if v == st.session_state.domain), domain_options[0])
+        
+        selected_domain_fmt = st.selectbox(
+            "Select domain",
+            options=domain_options,
+            index=domain_options.index(current_domain_fmt),
+            key="domain_select"
+        )
+        
+        # Convert back to actual domain value
+        selected_domain = domain_map[selected_domain_fmt]
+        
         # Update session state
         st.session_state.difficulty_level = difficulty_level
         st.session_state.code_length = code_length
-        
-        # Updated difficulty explanations with more specific descriptions
-        difficulty_explanation = {
-            "Easy": "Very basic errors (syntax, null values, simple naming) with clear indicators, perfect for beginners",
-            "Medium": "Mix of basic and intermediate errors requiring code reading skills, suitable for those with some Java experience",
-            "Hard": "Subtle logical errors, edge cases, and complex bugs that require deeper Java knowledge and debugging skills"
-        }
-
-        # Updated length explanation with beginner-friendly sizes
-        length_explanation = {
-            "Short": "15-30 lines of code, a single simple class with 1-2 methods - ideal for beginners",
-            "Medium": "40-80 lines, a class with 3-5 methods - good for intermediate practice",
-            "Long": "100-150 lines, 1-2 classes with several methods - for advanced review practice"
-        }
-        
-        st.markdown('<div class="param-value">', unsafe_allow_html=True)
-        st.markdown(f"**Difficulty:** {difficulty_level} - {difficulty_explanation[difficulty_level]}", unsafe_allow_html=True)
-        st.markdown(f"**Length:** {code_length} - {length_explanation[code_length]}", unsafe_allow_html=True)
-        st.markdown('</div>', unsafe_allow_html=True)
-        
-        st.markdown('</div>', unsafe_allow_html=True)
-        
-        return {
-            "difficulty_level": difficulty_level.lower(),
-            "code_length": code_length.lower()
-        }
+        st.session_state.domain = selected_domain

@@ -14,6 +14,7 @@ from langchain_core.language_models import BaseLanguageModel
 
 from utils.llm_logger import LLMInteractionLogger
 from utils.code_utils import create_evaluation_prompt, create_regeneration_prompt, process_llm_response
+from utils.domain_utils import infer_domain_from_code
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -114,7 +115,7 @@ class CodeEvaluationAgent:
         """       
         
         # Determine domain from existing code
-        domain = self._infer_domain_from_code(code)
+        domain = infer_domain_from_code(code)
         
         # Extract missing and found errors
         missing_errors = []
@@ -163,44 +164,6 @@ class CodeEvaluationAgent:
         self.llm_logger.log_interaction("regeneration_prompt", prompt, "N/A - Prompt Only", metadata)
         
         return prompt
-
-    def _infer_domain_from_code(self, code: str) -> str:
-        """
-        Infer the domain of the code based on class and variable names.
-        
-        Args:
-            code: The Java code
-            
-        Returns:
-            Inferred domain string
-        """
-        code_lower = code.lower()
-        
-        # Check for common domains
-        domains = {
-            "student_management": ["student", "course", "enroll", "grade", "academic"],
-            "file_processing": ["file", "read", "write", "path", "directory"],
-            "data_validation": ["validate", "input", "check", "valid", "sanitize"],
-            "calculation": ["calculate", "compute", "math", "formula", "result"],
-            "inventory_system": ["inventory", "product", "stock", "item", "quantity"],
-            "notification_service": ["notify", "message", "alert", "notification", "send"],
-            "banking": ["account", "bank", "transaction", "balance", "deposit"],
-            "e-commerce": ["cart", "product", "order", "payment", "customer"]
-        }
-        
-        # Count domain-related terms
-        domain_scores = {}
-        for domain, terms in domains.items():
-            score = sum(code_lower.count(term) for term in terms)
-            domain_scores[domain] = score
-        
-        # Return the highest scoring domain, or a default
-        if domain_scores:
-            max_domain = max(domain_scores.items(), key=lambda x: x[1])
-            if max_domain[1] > 0:
-                return max_domain[0]
-        
-        return "general_application"  # Default domain
     
     def _extract_json_from_response(self, response: str) -> Optional[Dict[str, Any]]:
         """

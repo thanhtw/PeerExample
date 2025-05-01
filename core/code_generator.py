@@ -11,6 +11,7 @@ import logging
 from langchain_core.language_models import BaseLanguageModel
 from utils.code_utils import create_code_generation_prompt
 from utils.llm_logger import LLMInteractionLogger
+from utils.domain_utils import DOMAIN_LIST, get_random_domain
 
 # Configure logging
 logging.basicConfig(
@@ -39,36 +40,30 @@ class CodeGenerator:
         self.complexity_profiles = {
             "short": {
                 "class_count": 1,
-                "method_count_range": (1, 2),  # Reduced to 1-2 methods for beginners
-                "field_count_range": (1, 3),   # Fewer fields
-                "imports_count_range": (0, 1), # Minimal imports
-                "nested_class_prob": 0.0,      # No nested classes for beginners
-                "interface_prob": 0.0          # No interfaces for beginners
+                "method_count_range": (1, 2), 
+                "field_count_range": (1, 3),   
+                "imports_count_range": (0, 1), 
+                "nested_class_prob": 0.0,      
+                "interface_prob": 0.0          
             },
             "medium": {
                 "class_count": 1,
-                "method_count_range": (3, 5),  # Reduced from 3-6 to 3-5
-                "field_count_range": (2, 5),   # Reduced field count
-                "imports_count_range": (0, 3), # Fewer imports
-                "nested_class_prob": 0.1,      # Reduced probability of nested classes
-                "interface_prob": 0.1          # Reduced probability of interfaces
+                "method_count_range": (3, 5),  
+                "field_count_range": (2, 5),  
+                "imports_count_range": (0, 3),
+                "nested_class_prob": 0.1,    
+                "interface_prob": 0.1         
             },
             "long": {
-                "class_count": 1,              # Changed from 2 to 1 (with possibility of 2)
-                "method_count_range": (4, 8),  # Reduced from 5-10 to 4-8
-                "field_count_range": (3, 6),   # Reduced from 4-8 to 3-6
-                "imports_count_range": (1, 4), # Reduced from 2-6 to 1-4
-                "nested_class_prob": 0.3,      # Reduced from 0.5 to 0.3
-                "interface_prob": 0.2          # Reduced from 0.4 to 0.2
+                "class_count": 1,             
+                "method_count_range": (4, 8),  
+                "field_count_range": (3, 6),  
+                "imports_count_range": (1, 4), 
+                "nested_class_prob": 0.3,      
+                "interface_prob": 0.2          
             }
         }
         
-        # Common Java domains to make code more realistic
-        self.domains = [
-            "user_management", "file_processing", "data_validation", 
-            "calculation", "inventory_system", "notification_service",
-            "logging", "banking", "e-commerce", "student_management"
-        ]
      
     def _generate_with_llm(self, code_length: str, difficulty_level: str, domain: str = None, 
                        selected_errors=None) -> str:
@@ -87,7 +82,7 @@ class CodeGenerator:
         """
         # Select a domain if not provided
         if not domain:
-            domain = random.choice(self.domains)
+            domain = get_random_domain()
         
         # Create a detailed prompt for the LLM using shared utility
         prompt = create_code_generation_prompt(

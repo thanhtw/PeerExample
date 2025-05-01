@@ -35,8 +35,10 @@ def generate_code_problem(workflow,
         state = st.session_state.workflow_state
         code_length = str(params.get("code_length", "medium"))
         difficulty_level = str(params.get("difficulty_level", "medium"))
+        domain = params.get("domain", "general_application")
         state.code_length = code_length
         state.difficulty_level = difficulty_level
+        state.domain = domain
         
         # Verify we have error selections based on mode
         has_selections = False

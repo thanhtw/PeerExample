@@ -11,6 +11,8 @@ from typing import Dict, Any, List, Tuple, Optional
 
 from state_schema import WorkflowState, CodeSnippet
 from utils.code_utils import extract_both_code_versions, get_error_count_for_difficulty
+from utils.code_utils import create_regeneration_prompt
+from utils.domain_utils import infer_domain_from_code, update_state_with_domain
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -55,6 +57,7 @@ class WorkflowNodes:
             difficulty_level = state.difficulty_level
             selected_error_categories = state.selected_error_categories
             selected_specific_errors = state.selected_specific_errors
+            domain = getattr(state, 'domain', None)
             
             # Reset state for a fresh generation
             state.evaluation_attempts = 0
@@ -117,6 +120,7 @@ class WorkflowNodes:
             response = self.code_generator._generate_with_llm(
                 code_length=code_length,
                 difficulty_level=difficulty_level,
+                domain=domain,
                 selected_errors=selected_errors
             )
 
@@ -140,6 +144,10 @@ class WorkflowNodes:
             # Update state
             state.code_snippet = code_snippet
             state.current_step = "evaluate"  # Set to evaluate instead of review to ensure proper workflow
+
+            # Update state with inferred domain if not already set
+            if not hasattr(state, 'domain') or not state.domain:
+                update_state_with_domain(state, code=annotated_code)
             return state
                     
         except Exception as e:           
@@ -308,12 +316,12 @@ class WorkflowNodes:
                     )
                 else:
                     # Import the updated function if not available as a method
-                    from utils.code_utils import create_regeneration_prompt
+                    
                     
                     # Prepare data for regeneration with emphasis on having exactly the right errors
                     feedback = create_regeneration_prompt(
                         code=code,
-                        domain=self._infer_domain_from_code(code),
+                        domain=domain,                        
                         missing_errors=evaluation_result.get('missing_errors', []),
                         found_errors=evaluation_result.get('found_errors', []),
                         requested_errors=requested_errors,
@@ -329,13 +337,11 @@ class WorkflowNodes:
                         code, requested_errors, evaluation_result
                     )
                 else:
-                    # Import the updated function if not available as a method
-                    from utils.code_utils import create_regeneration_prompt
-                    
+                    domain = getattr(state, 'domain', None) or infer_domain_from_code(code)                  
                     # Use the regeneration prompt with emphasis on adding missing errors
                     feedback = create_regeneration_prompt(
                         code=code,
-                        domain=self._infer_domain_from_code(code),
+                        domain=domain,                       
                         missing_errors=evaluation_result.get('missing_errors', []),
                         found_errors=evaluation_result.get('found_errors', []),
                         requested_errors=requested_errors,
@@ -345,11 +351,10 @@ class WorkflowNodes:
                 # No missing or extra errors - we're good!
                 logger.info(f"All {original_error_count} requested errors implemented correctly")
                 
-                # Still create a feedback prompt in case we need it later
-                from utils.code_utils import create_regeneration_prompt
+        
                 feedback = create_regeneration_prompt(
                     code=code,
-                    domain=self._infer_domain_from_code(code),
+                    domain=domain,                  
                     missing_errors=[],
                     found_errors=evaluation_result.get('found_errors', []),
                     requested_errors=requested_errors,
@@ -495,44 +500,6 @@ class WorkflowNodes:
             logger.error(f"Error analyzing review: {str(e)}", exc_info=True)
             state.error = f"Error analyzing review: {str(e)}"
             return state
-    
-    def _infer_domain_from_code(self, code: str) -> str:
-        """
-        Infer the domain of the code based on class and variable names.
-        
-        Args:
-            code: The Java code
-            
-        Returns:
-            Inferred domain string
-        """
-        code_lower = code.lower()
-        
-        # Check for common domains
-        domains = {
-            "student_management": ["student", "course", "enroll", "grade", "academic"],
-            "file_processing": ["file", "read", "write", "path", "directory"],
-            "data_validation": ["validate", "input", "check", "valid", "sanitize"],
-            "calculation": ["calculate", "compute", "math", "formula", "result"],
-            "inventory_system": ["inventory", "product", "stock", "item", "quantity"],
-            "notification_service": ["notify", "message", "alert", "notification", "send"],
-            "banking": ["account", "bank", "transaction", "balance", "deposit"],
-            "e-commerce": ["cart", "product", "order", "payment", "customer"]
-        }
-        
-        # Count domain-related terms
-        domain_scores = {}
-        for domain, terms in domains.items():
-            score = sum(code_lower.count(term) for term in terms)
-            domain_scores[domain] = score
-        
-        # Return the highest scoring domain, or a default
-        if domain_scores:
-            max_domain = max(domain_scores.items(), key=lambda x: x[1])
-            if max_domain[1] > 0:
-                return max_domain[0]
-        
-        return "general_application"  # Default domain
             
     def _extract_requested_errors(self, state: WorkflowState) -> List[Dict[str, Any]]:
         """
