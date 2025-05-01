@@ -33,7 +33,7 @@ class JsonErrorRepository:
         
         Args:
             build_errors_path: Path to the build errors JSON file
-            checkstyle_errors_path: Path to the checkstyle errors JSON file
+            checkstyle_errors_path: Path to the code quality errors JSON file
         """
         self.build_errors_path = build_errors_path
         self.checkstyle_errors_path = checkstyle_errors_path
@@ -87,13 +87,13 @@ class JsonErrorRepository:
     
     def _load_checkstyle_errors(self) -> bool:
         """
-        Load checkstyle errors from JSON file.
+        Load code quality errors from JSON file.
         
         Returns:
             True if file is loaded successfully, False otherwise
         """
         try:
-            # Try different paths to find the checkstyle errors file
+            # Try different paths to find the code quality errors file
             file_paths = self._get_potential_file_paths(self.checkstyle_errors_path)
             
             for file_path in file_paths:
@@ -101,14 +101,14 @@ class JsonErrorRepository:
                     with open(file_path, 'r') as file:
                         self.checkstyle_errors = json.load(file)
                         self.checkstyle_categories = list(self.checkstyle_errors.keys())
-                        #logger.info(f"Loaded checkstyle errors from {file_path} with {len(self.checkstyle_categories)} categories")
+                        #logger.info(f"Loaded code quality errors from {file_path} with {len(self.checkstyle_categories)} categories")
                         return True
             
-            logger.warning(f"Could not find checkstyle errors file: {self.checkstyle_errors_path}")
+            logger.warning(f"Could not find code quality errors file: {self.checkstyle_errors_path}")
             return False
             
         except Exception as e:
-            logger.error(f"Error loading checkstyle errors: {str(e)}")
+            logger.error(f"Error loading code quality errors: {str(e)}")
             return False
     
     def _get_potential_file_paths(self, file_name: str) -> List[str]:
@@ -188,7 +188,7 @@ class JsonErrorRepository:
                 if category in self.build_errors:
                     selected_errors["build"].extend(self.build_errors[category])
         
-        # Get checkstyle errors
+        # Get code quality errors
         if "checkstyle" in selected_categories:
             for category in selected_categories["checkstyle"]:
                 if category in self.checkstyle_errors:
@@ -248,7 +248,7 @@ class JsonErrorRepository:
                         "implementation_guide": error.get("implementation_guide", "")
                     })
         
-        # Checkstyle errors
+        # code quality errors
         for category in checkstyle_categories:
             if category in self.checkstyle_errors:
                 for error in self.checkstyle_errors[category]:
@@ -379,7 +379,7 @@ class JsonErrorRepository:
                                 "implementation_guide": error.get("implementation_guide", "")
                             })
             
-            # Checkstyle errors - randomly select from each category
+            # code quality errors - randomly select from each category
             for category in selected_categories.get("checkstyle", []):
                 if category in self.checkstyle_errors:
                     category_errors = self.checkstyle_errors[category]
@@ -481,7 +481,7 @@ class JsonErrorRepository:
                         "description": error["description"]
                     })
         
-        # Search checkstyle errors
+        # Search code quality errors
         for category in self.checkstyle_errors:
             for error in self.checkstyle_errors[category]:
                 name = error.get("check_name", "").lower()
